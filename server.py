@@ -1,12 +1,39 @@
 """Minimal HTTPS server."""
 
+import os
 import ssl
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer, SimpleHTTPRequestHandler
 
 HOST = "127.0.0.1"
 PORT = 9001
-CERT_FILE = "cert.pem"
-KEY_FILE = "key.pem"
+REDIRECT_PORT = 8080
+CERT_FILE = os.environ.get("TLS_CERT_FILE", "cert.pem")
+KEY_FILE = os.environ.get("TLS_KEY_FILE", "key.pem")
+
+
+class RedirectHandler(BaseHTTPRequestHandler):
+    """Answers every request with a 301 to the HTTPS equivalent."""
+
+    protocol_version = "HTTP/1.1"
+
+    def _redirect(self) -> None:
+        # The target host is taken from configuration, never from the request,
+        # so a forged Host header cannot turn this into an open redirect.
+        path = self.path if self.path.startswith("/") else "/"
+        self.send_response(301)
+        self.send_header("Location", f"https://{HOST}:{PORT}{path}")
+        self.send_header("Content-Length", "0")
+        self.send_header("Connection", "close")
+        self.end_headers()
+
+    do_GET = _redirect
+    do_HEAD = _redirect
+    do_POST = _redirect
+    do_PUT = _redirect
+    do_DELETE = _redirect
+    do_PATCH = _redirect
+    do_OPTIONS = _redirect
 
 
 def main() -> None:
@@ -14,15 +41,28 @@ def main() -> None:
 
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.minimum_version = ssl.TLSVersion.TLSv1_2
-    context.load_cert_chain(certfile=CERT_FILE, keyfile=KEY_FILE)
+    try:
+        context.load_cert_chain(certfile=CERT_FILE, keyfile=KEY_FILE)
+    except FileNotFoundError:
+        raise SystemExit(
+            "TLS certificate files not found. "
+            "Set TLS_CERT_FILE and TLS_KEY_FILE to existing files, "
+            "or generate local dev certs (for example with openssl)."
+        )
     httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
 
+    redirectd = HTTPServer((HOST, REDIRECT_PORT), RedirectHandler)
+    threading.Thread(target=redirectd.serve_forever, daemon=True).start()
+
+    print(f"Redirecting http://{HOST}:{REDIRECT_PORT} -> https://{HOST}:{PORT}")
     print(f"Serving on https://{HOST}:{PORT}")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
         pass
     finally:
+        redirectd.shutdown()
+        redirectd.server_close()
         httpd.server_close()
 
 
