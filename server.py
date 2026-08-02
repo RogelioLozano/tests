@@ -3,6 +3,7 @@
 import os
 import ssl
 import threading
+from functools import partial
 from http.server import BaseHTTPRequestHandler, HTTPServer, SimpleHTTPRequestHandler
 
 HOST = "127.0.0.1"
@@ -10,6 +11,11 @@ PORT = 9001
 REDIRECT_PORT = 8080
 CERT_FILE = os.environ.get("TLS_CERT_FILE", "cert.pem")
 KEY_FILE = os.environ.get("TLS_KEY_FILE", "key.pem")
+# Resolved from this file, not the CWD, so the served tree never depends on where
+# the process was launched from.
+SERVE_DIR = os.environ.get(
+    "SERVE_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "public")
+)
 
 
 class RedirectHandler(BaseHTTPRequestHandler):
@@ -37,7 +43,11 @@ class RedirectHandler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
-    httpd = HTTPServer((HOST, PORT), SimpleHTTPRequestHandler)
+    if not os.path.isdir(SERVE_DIR):
+        raise SystemExit(f"Served directory not found: {SERVE_DIR}")
+
+    handler = partial(SimpleHTTPRequestHandler, directory=SERVE_DIR)
+    httpd = HTTPServer((HOST, PORT), handler)
 
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.minimum_version = ssl.TLSVersion.TLSv1_2
@@ -55,7 +65,7 @@ def main() -> None:
     threading.Thread(target=redirectd.serve_forever, daemon=True).start()
 
     print(f"Redirecting http://{HOST}:{REDIRECT_PORT} -> https://{HOST}:{PORT}")
-    print(f"Serving on https://{HOST}:{PORT}")
+    print(f"Serving {SERVE_DIR} on https://{HOST}:{PORT}")
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
