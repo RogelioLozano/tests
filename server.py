@@ -4,7 +4,11 @@ import os
 import ssl
 import threading
 from functools import partial
-from http.server import BaseHTTPRequestHandler, HTTPServer, SimpleHTTPRequestHandler
+from http.server import (
+    BaseHTTPRequestHandler,
+    SimpleHTTPRequestHandler,
+    ThreadingHTTPServer,
+)
 
 HOST = "127.0.0.1"
 PORT = 9001
@@ -62,7 +66,7 @@ def main() -> None:
         raise SystemExit(f"Served directory not found: {SERVE_DIR}")
 
     handler = partial(StaticHandler, directory=SERVE_DIR)
-    httpd = HTTPServer((HOST, PORT), handler)
+    httpd = ThreadingHTTPServer((HOST, PORT), handler)
 
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.minimum_version = ssl.TLSVersion.TLSv1_2
@@ -76,7 +80,7 @@ def main() -> None:
         )
     httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
 
-    redirectd = HTTPServer((HOST, REDIRECT_PORT), RedirectHandler)
+    redirectd = ThreadingHTTPServer((HOST, REDIRECT_PORT), RedirectHandler)
     threading.Thread(target=redirectd.serve_forever, daemon=True).start()
 
     print(f"Redirecting http://{HOST}:{REDIRECT_PORT} -> https://{HOST}:{PORT}")
