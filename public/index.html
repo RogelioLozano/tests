@@ -2,10 +2,31 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Local HTTPS dev server</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Quarterly figures</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="stylesheet" href="/assets/app.4f2a91c.css" />
+    <script type="module" src="/assets/app.4f2a91c.mjs"></script>
   </head>
   <body>
-    <h1>It works over TLS.</h1>
-    <p>Only files in <code>public/</code> are reachable.</p>
+    <main>
+      <h1>Quarterly figures</h1>
+      <p class="lede">
+        A built bundle served from <code>public/</code> over TLS.
+      </p>
+
+      <section class="card">
+        <h2>Revenue</h2>
+        <dl>
+          <dt>Quarter</dt>
+          <dd id="quarter">&hellip;</dd>
+          <dt>Total</dt>
+          <dd id="revenue" class="total">&hellip;</dd>
+        </dl>
+      </section>
+
+      <footer id="status">Loading&hellip;</footer>
+    </main>
   </body>
 </html>

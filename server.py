@@ -4,7 +4,11 @@ import os
 import ssl
 import threading
 from functools import partial
-from http.server import BaseHTTPRequestHandler, HTTPServer, SimpleHTTPRequestHandler
+from http.server import (
+    BaseHTTPRequestHandler,
+    SimpleHTTPRequestHandler,
+    ThreadingHTTPServer,
+)
 
 HOST = "127.0.0.1"
 PORT = 9001
@@ -20,9 +24,48 @@ SERVE_DIR = os.environ.get(
 CORS_ALLOWED_ORIGINS = frozenset(
     o.strip() for o in os.environ.get("CORS_ALLOW_ORIGIN", "").split(",") if o.strip()
 )
+NOT_FOUND_PAGE = os.path.join(SERVE_DIR, "404.html")
 
 
 class StaticHandler(SimpleHTTPRequestHandler):
+    # The stdlib mapping defers to the platform mimetypes database, which varies
+    # by machine and omits newer web types; pin the ones a frontend needs.
+    extensions_map = {
+        **SimpleHTTPRequestHandler.extensions_map,
+        ".html": "text/html; charset=utf-8",
+        ".css": "text/css; charset=utf-8",
+        ".js": "text/javascript; charset=utf-8",
+        ".mjs": "text/javascript; charset=utf-8",
+        ".json": "application/json; charset=utf-8",
+        ".map": "application/json; charset=utf-8",
+        ".svg": "image/svg+xml",
+        ".webmanifest": "application/manifest+json",
+        ".woff2": "font/woff2",
+    }
+
+    def list_directory(self, path: str) -> None:
+        # A directory with no index file is not content. Listing it would hand a
+        # visitor a map of the tree, so it is indistinguishable from a missing path.
+        self.send_error(404, "Not Found")
+        return None
+
+    def send_error(self, code: int, message=None, explain=None) -> None:
+        if code == 404:
+            try:
+                with open(NOT_FOUND_PAGE, "rb") as page:
+                    body = page.read()
+            except OSError:
+                pass  # No custom page installed; fall through to the stdlib one.
+            else:
+                self.send_response(404, message)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                if self.command != "HEAD":
+                    self.wfile.write(body)
+                return
+        super().send_error(code, message, explain)
+
     def end_headers(self) -> None:
         origin = self.headers.get("Origin")
         # Exact match against the allowlist; echoing back an arbitrary Origin would
@@ -62,7 +105,7 @@ def main() -> None:
         raise SystemExit(f"Served directory not found: {SERVE_DIR}")
 
     handler = partial(StaticHandler, directory=SERVE_DIR)
-    httpd = HTTPServer((HOST, PORT), handler)
+    httpd = ThreadingHTTPServer((HOST, PORT), handler)
 
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.minimum_version = ssl.TLSVersion.TLSv1_2
@@ -76,7 +119,7 @@ def main() -> None:
         )
     httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
 
-    redirectd = HTTPServer((HOST, REDIRECT_PORT), RedirectHandler)
+    redirectd = ThreadingHTTPServer((HOST, REDIRECT_PORT), RedirectHandler)
     threading.Thread(target=redirectd.serve_forever, daemon=True).start()
 
     print(f"Redirecting http://{HOST}:{REDIRECT_PORT} -> https://{HOST}:{PORT}")
