@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>CORS demo — the calling origin</title>
+    <style>
+      body {
+        font-family: system-ui;
+        max-width: 40rem;
+        margin: 3rem auto;
+      }
+      pre {
+        background: #f4f4f4;
+        padding: 1rem;
+        white-space: pre-wrap;
+      }
+      .ok {
+        color: #0a0;
+      }
+      .fail {
+        color: #c00;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>This page is origin <code id="origin"></code></h1>
+    <p>It will ask <code>https://127.0.0.1:9001/data.json</code> for data.</p>
+    <button id="go">fetch the data</button>
+    <pre id="out">(not run yet)</pre>
+
+    <script>
+      document.getElementById("origin").textContent = location.origin;
+      document.getElementById("go").onclick = async () => {
+        const out = document.getElementById("out");
+        out.className = "";
+        out.textContent = "fetching...";
+        try {
+          const res = await fetch("https://127.0.0.1:9001/data.json");
+          out.className = "ok";
+          out.textContent =
+            "ALLOWED — the browser released the body:\n\n" + (await res.text());
+        } catch (err) {
+          out.className = "fail";
+          out.textContent =
+            "BLOCKED — the browser refused to hand it over:\n\n" +
+            err +
+            "\n\n(open DevTools console for the full CORS message)";
+        }
+      };
+    </script>
+  </body>
+</html>

@@ -16,6 +16,21 @@ KEY_FILE = os.environ.get("TLS_KEY_FILE", "key.pem")
 SERVE_DIR = os.environ.get(
     "SERVE_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "public")
 )
+# Comma-separated origins allowed to read responses from scripts. Empty = none.
+CORS_ALLOWED_ORIGINS = frozenset(
+    o.strip() for o in os.environ.get("CORS_ALLOW_ORIGIN", "").split(",") if o.strip()
+)
+
+
+class StaticHandler(SimpleHTTPRequestHandler):
+    def end_headers(self) -> None:
+        origin = self.headers.get("Origin")
+        # Exact match against the allowlist; echoing back an arbitrary Origin would
+        # grant access to every site.
+        if origin and origin in CORS_ALLOWED_ORIGINS:
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
+        super().end_headers()
 
 
 class RedirectHandler(BaseHTTPRequestHandler):
@@ -46,7 +61,7 @@ def main() -> None:
     if not os.path.isdir(SERVE_DIR):
         raise SystemExit(f"Served directory not found: {SERVE_DIR}")
 
-    handler = partial(SimpleHTTPRequestHandler, directory=SERVE_DIR)
+    handler = partial(StaticHandler, directory=SERVE_DIR)
     httpd = HTTPServer((HOST, PORT), handler)
 
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
