@@ -11,22 +11,12 @@
   </head>
   <body>
     <main>
-      <h1>Quarterly figures</h1>
-      <p class="lede">
-        A built bundle served from <code>public/</code> over TLS.
-      </p>
-
-      <section class="card">
-        <h2>Revenue</h2>
-        <dl>
-          <dt>Quarter</dt>
-          <dd id="quarter">&hellip;</dd>
-          <dt>Total</dt>
-          <dd id="revenue" class="total">&hellip;</dd>
-        </dl>
-      </section>
-
-      <footer id="status">Loading&hellip;</footer>
+      <nav class="tabs">
+        <a href="/" data-link>Dashboard</a>
+        <a href="/about" data-link>About</a>
+      </nav>
+      <div id="view"></div>
+      <footer id="status"></footer>
     </main>
   </body>
 </html>
