@@ -9,6 +9,7 @@ from http.server import (
     SimpleHTTPRequestHandler,
     ThreadingHTTPServer,
 )
+from urllib.parse import urlsplit
 
 HOST = "127.0.0.1"
 PORT = 9001
@@ -25,6 +26,7 @@ CORS_ALLOWED_ORIGINS = frozenset(
     o.strip() for o in os.environ.get("CORS_ALLOW_ORIGIN", "").split(",") if o.strip()
 )
 NOT_FOUND_PAGE = os.path.join(SERVE_DIR, "404.html")
+INDEX_PAGE = os.path.join(SERVE_DIR, "index.html")
 
 
 class StaticHandler(SimpleHTTPRequestHandler):
@@ -51,13 +53,20 @@ class StaticHandler(SimpleHTTPRequestHandler):
 
     def send_error(self, code: int, message=None, explain=None) -> None:
         if code == 404:
+            # An extensionless path (e.g. /about) is a client-side route, not a
+            # missing asset: hand back index.html so the router can render it.
+            # A missing file with an extension (e.g. /img/typo.png) is a real 404.
+            request_path = urlsplit(self.path).path
+            is_route = "." not in os.path.basename(request_path)
+            fallback = INDEX_PAGE if is_route else NOT_FOUND_PAGE
             try:
-                with open(NOT_FOUND_PAGE, "rb") as page:
+                with open(fallback, "rb") as page:
                     body = page.read()
             except OSError:
                 pass  # No custom page installed; fall through to the stdlib one.
             else:
-                self.send_response(404, message)
+                status = 200 if is_route else 404
+                self.send_response(status, message)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()

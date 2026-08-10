@@ -37,6 +37,23 @@ h1 {
   margin: 0 0 2rem;
 }
 
+.tabs {
+  display: flex;
+  gap: 1rem;
+  margin: 0 0 2rem;
+  font-size: 0.9rem;
+}
+
+.tabs a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.tabs a[aria-current="page"] {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 .card {
   border: 1px solid var(--line);
   border-radius: 10px;
