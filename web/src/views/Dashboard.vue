@@ -13,7 +13,7 @@ function formatMoney(amount, currency) {
 }
 
 onMounted(() => {
-  fetch("/data.json", { headers: { Accept: "application/json" } })
+  fetch("/api/data.json", { headers: { Accept: "application/json" } })
     .then((response) => {
       if (!response.ok) {
         throw new Error(`${response.status} ${response.statusText}`);
@@ -42,6 +42,6 @@ onMounted(() => {
     </dl>
   </section>
   <footer id="status" :class="{ error: error }">
-    {{ error ? `Could not load /data.json: ${error}` : data ? "Loaded." : "Loading\u2026" }}
+    {{ error ? `Could not load /api/data.json: ${error}` : data ? "Loaded." : "Loading\u2026" }}
   </footer>
 </template>

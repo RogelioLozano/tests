@@ -51,6 +51,13 @@ class StaticHandler(SimpleHTTPRequestHandler):
         self.send_error(404, "Not Found")
         return None
 
+    def translate_path(self, path: str) -> str:
+        # Placeholder for the future FastAPI backend: for now /api/* is served
+        # from the same static directory, with the /api prefix stripped.
+        if path == "/api" or path.startswith("/api/"):
+            path = path[len("/api"):] or "/"
+        return super().translate_path(path)
+
     def send_error(self, code: int, message=None, explain=None) -> None:
         if code == 404:
             # An extensionless path (e.g. /about) is a client-side route, not a
