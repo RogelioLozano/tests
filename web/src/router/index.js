@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from "vue-router";
 import Dashboard from "../views/Dashboard.vue";
 import About from "../views/About.vue";
 import Waifu from "../views/Waifu.vue";
+import Animations from "../views/Animations.vue";
 import NotFound from "../views/NotFound.vue";
 
 export default createRouter({
@@ -10,6 +11,7 @@ export default createRouter({
     { path: "/", component: Dashboard },
     { path: "/about", component: About },
     { path: "/waifu", component: Waifu },
+    { path: "/animations", component: Animations },
     { path: "/:pathMatch(.*)*", component: NotFound },
   ],
 });

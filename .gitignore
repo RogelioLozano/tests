@@ -1,3 +1,17 @@
 *.pem
 __pycache__/
 .vscode/
+
+# Python virtual environment (local only; recreate from requirements.txt)
+.venv/
+
+# Manim scratch/render tree (rendered artifacts live in animations/output/)
+media/
+
+# Rendered animation artifacts (regenerate via the Manim pipeline; keep folder)
+animations/output/*
+!animations/output/.gitkeep
+
+# Rendered videos copied into the Vue app for serving (regenerable)
+web/public/animations/*
+!web/public/animations/.gitkeep

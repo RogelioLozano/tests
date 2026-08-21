@@ -7,6 +7,7 @@
       <RouterLink to="/">Dashboard</RouterLink>
       <RouterLink to="/about">About</RouterLink>
       <RouterLink to="/waifu">Waifu</RouterLink>
+      <RouterLink to="/animations">Animations</RouterLink>
     </nav>
     <div id="view">
       <RouterView />
