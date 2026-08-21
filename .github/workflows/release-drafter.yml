@@ -2,13 +2,12 @@ name: Release Drafter
 
 # Keep a single draft release up to date. Every time a pull request is
 # merged into main, this recalculates the draft's notes and next version.
+# Release Drafter reads this config from the default branch, so it only runs
+# on push to main (running it on PR branches fails until the config is merged).
 on:
   push:
     branches:
       - main
-  # Lets the draft update the moment a PR is merged, not only on push events.
-  pull_request:
-    types: [opened, reopened, synchronize]
 
 permissions:
   contents: read
