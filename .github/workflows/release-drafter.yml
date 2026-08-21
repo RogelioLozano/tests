@@ -1,0 +1,28 @@
+name: Release Drafter
+
+# Keep a single draft release up to date. Every time a pull request is
+# merged into main, this recalculates the draft's notes and next version.
+# Release Drafter reads this config from the default branch, so it only runs
+# on push to main (running it on PR branches fails until the config is merged).
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  update_release_draft:
+    permissions:
+      # Needed to create and update the draft release.
+      contents: write
+      # Needed to read merged pull requests for the notes.
+      pull-requests: read
+    runs-on: ubuntu-latest
+    steps:
+      # Pinned to the v6 major tag. For stronger supply-chain safety, replace
+      # "@v6" with the full commit SHA that v6 points to.
+      - uses: release-drafter/release-drafter@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
