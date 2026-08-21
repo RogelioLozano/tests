@@ -90,6 +90,13 @@ dd {
   font-weight: 600;
 }
 
+.waifu-img {
+  display: block;
+  max-width: 100%;
+  border-radius: 8px;
+  margin: 0 0 1rem;
+}
+
 .error {
   color: #cf222e;
 }
