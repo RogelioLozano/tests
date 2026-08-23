@@ -1,6 +1,7 @@
 *.pem
 __pycache__/
 .vscode/
+.pytest_cache/
 
 # Python virtual environment (local only; recreate from requirements.txt)
 .venv/
@@ -8,7 +9,8 @@ __pycache__/
 # Manim scratch/render tree (rendered artifacts live in animations/output/)
 media/
 
-# Rendered animation artifacts (regenerate via the Manim pipeline; keep folder)
+# Render artifacts, the served library, and the job metadata database
+# (all regenerable via the render pipeline; keep the folder)
 animations/output/*
 !animations/output/.gitkeep
 

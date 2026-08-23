@@ -1,1 +1,10 @@
+# Animation rendering
 manim==0.21.0
+
+# Backend API
+fastapi==0.121.2
+uvicorn[standard]==0.41.0
+pydantic==2.13.1
+
+# Chat-completions client for the LLM code generator
+httpx==0.28.1
