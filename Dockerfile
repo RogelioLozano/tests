@@ -56,7 +56,13 @@ ENV PYTHONUNBUFFERED=1 \
     ANIM_OUTPUT_DIR=/data \
     ANIM_STATIC_DIR=/srv/web/dist \
     ANIM_JOBS_BACKEND=thread \
-    ANIM_JOBS_MAX_WORKERS=2
+    ANIM_JOBS_MAX_WORKERS=1 \
+    ANIM_MAX_QUALITY=low
+
+# The last two are sized for the smallest instance this is likely to run on
+# (512 MB): one low-quality render peaks near 217 MB, two would not fit, and a
+# 1080p one needs ~981 MB. Raise them deliberately when the instance is bigger,
+# rather than discovering the ceiling as an OOM kill.
 
 WORKDIR /srv/backend
 EXPOSE 8000

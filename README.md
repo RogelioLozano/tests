@@ -146,6 +146,20 @@ but it is a hint and never a substitute: the validator rejects whatever comes
 back regardless. When it does, its complaints are fed back to the model and the
 generation is retried, up to `ANIM_AI_MAX_ATTEMPTS`.
 
+#### LaTeX
+
+The validator also enforces what the *environment* can do, not just what is
+safe. Manim shells out to `latex` for `Tex`, `MathTex`, `Title`, `Matrix`,
+`DecimalNumber` and `include_numbers=True`; the image ships without texlive
+because it would add roughly a gigabyte. Those constructs are therefore
+rejected up front, with a message telling the model to use `Text` instead —
+otherwise they surface as `FileNotFoundError: 'latex'` from deep inside a
+render that has already been paid for.
+
+Availability is detected (`shutil.which("latex")`) rather than assumed, so
+installing texlive is enough to unlock them. `ANIM_LATEX_AVAILABLE` overrides
+the detection either way.
+
 This is not a sandbox. It raises the cost of a malicious or prompt-injected
 generation sharply, but running genuinely untrusted prompts in production needs
 OS-level isolation (separate user, container, seccomp) around the renderer too.
