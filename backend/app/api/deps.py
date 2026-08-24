@@ -10,6 +10,7 @@ from typing import Annotated
 
 from fastapi import Depends, Request
 
+from app.api.auth import require_api_key
 from app.api.rate_limit import client_identity
 from app.application.animation_service import AnimationService
 from app.core.container import Container
@@ -53,3 +54,7 @@ def enforce_render_quota(request: Request) -> None:
 AnimationServiceDep = Annotated[AnimationService, Depends(get_animation_service)]
 ContainerDep = Annotated[Container, Depends(get_container)]
 RenderQuota = Depends(enforce_render_quota)
+# The two guards on the expensive route defend the same thing for different
+# reasons: the key stops strangers, the quota stops anyone (friends included)
+# from running up a bill.
+RequireApiKey = Depends(require_api_key)

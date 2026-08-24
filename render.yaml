@@ -43,6 +43,12 @@ services:
     envVars:
       - key: ANIM_LLM_API_KEY
         sync: false # set in the dashboard; never commit a key
+      # Shared access code gating prompt submission. Reads stay open, so the
+      # demo is visible to anyone while only the paid path needs the code.
+      # Generate with: openssl rand -hex 32
+      # Leave unset to run fully open.
+      - key: ANIM_API_KEY
+        sync: false
       - key: ANIM_LLM_BASE_URL
         value: https://api.groq.com/openai/v1
       - key: ANIM_LLM_MODEL

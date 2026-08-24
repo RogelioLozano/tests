@@ -111,3 +111,6 @@ class CapabilitiesResponse(BaseModel):
     qualities: list[str]
     default_quality: str
     max_prompt_chars: int
+    # Whether submitting a prompt needs an access code. Not the code itself,
+    # obviously — only whether the UI should ask for one.
+    requires_key: bool = False

@@ -5,6 +5,34 @@
 
 const BASE = "/api/v1/animations";
 
+// The access code is a shared secret the user is given, not a per-user
+// credential, and it is only ever a courier here: the server is the only party
+// that knows the real value and can judge it.
+const KEY_STORAGE = "anim.accessCode";
+const API_KEY_HEADER = "X-API-Key";
+
+export function getAccessCode() {
+  try {
+    return localStorage.getItem(KEY_STORAGE) ?? "";
+  } catch {
+    return ""; // private browsing can throw on access
+  }
+}
+
+export function setAccessCode(code) {
+  try {
+    if (code) localStorage.setItem(KEY_STORAGE, code);
+    else localStorage.removeItem(KEY_STORAGE);
+  } catch {
+    // Non-fatal; the code just will not persist across reloads.
+  }
+}
+
+function authHeaders() {
+  const code = getAccessCode();
+  return code ? { [API_KEY_HEADER]: code } : {};
+}
+
 // The API answers 202 and expects polling. That holds whether the backend
 // renders inline or hands off to a worker, so nothing here has to change when
 // it does.
@@ -52,9 +80,18 @@ async function request(path, options = {}) {
 export function createAnimation(prompt, quality) {
   return request("", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ prompt, quality }),
   });
+}
+
+/** Ask the server whether a code is valid, so the user finds out immediately. */
+export async function checkAccessCode(code) {
+  const response = await fetch("/api/v1/auth/check", {
+    method: "POST",
+    headers: { [API_KEY_HEADER]: code },
+  });
+  return response.ok;
 }
 
 export function getAnimation(id) {

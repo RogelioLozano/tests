@@ -1,11 +1,14 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import {
+  checkAccessCode,
   createAnimation,
+  getAccessCode,
   getAnimationSource,
   getCapabilities,
   isTerminal,
   listAnimations,
+  setAccessCode,
   waitForJob,
 } from "../api/animations";
 
@@ -31,6 +34,9 @@ const quality = ref("low");
 // low only, and picking one it cannot afford would OOM the container.
 const qualities = ref([{ value: "low", label: QUALITY_LABELS.low }]);
 const maxPromptChars = ref(1000);
+const requiresKey = ref(false);
+const accessCode = ref(getAccessCode());
+const codeState = ref("unknown"); // unknown | checking | valid | invalid
 const jobs = ref([]);
 const selectedId = ref(null);
 const source = ref(null);
@@ -43,7 +49,10 @@ const selected = computed(
   () => jobs.value.find((job) => job.id === selectedId.value) ?? null,
 );
 const canSubmit = computed(
-  () => prompt.value.trim().length > 0 && !submitting.value,
+  () =>
+    prompt.value.trim().length > 0 &&
+    !submitting.value &&
+    (!requiresKey.value || accessCode.value.trim().length > 0),
 );
 
 function label(job) {
@@ -76,11 +85,31 @@ async function loadCapabilities() {
       label: QUALITY_LABELS[value] ?? value,
     }));
     maxPromptChars.value = caps.max_prompt_chars;
+    requiresKey.value = caps.requires_key;
     if (!caps.qualities.includes(quality.value)) {
       quality.value = caps.default_quality ?? caps.qualities[0];
     }
+    if (requiresKey.value && accessCode.value) verifyCode();
   } catch {
     // Non-fatal: the default single low option is already usable.
+  }
+}
+
+// The browser cannot judge the code itself — it has nothing to compare
+// against — so it asks the server.
+async function verifyCode() {
+  const code = accessCode.value.trim();
+  if (!code) {
+    codeState.value = "unknown";
+    return;
+  }
+  codeState.value = "checking";
+  try {
+    const ok = await checkAccessCode(code);
+    codeState.value = ok ? "valid" : "invalid";
+    setAccessCode(ok ? code : "");
+  } catch {
+    codeState.value = "unknown";
   }
 }
 
@@ -111,6 +140,9 @@ async function submit() {
     }
   } catch (err) {
     error.value = err.message;
+    if (err.code === "invalid_api_key" || err.code === "api_key_required") {
+      codeState.value = "invalid";
+    }
   } finally {
     submitting.value = false;
   }
@@ -147,6 +179,33 @@ onUnmounted(() => poller?.abort());
 
   <section class="card">
     <h2>New animation</h2>
+    <div v-if="requiresKey" class="access">
+      <label for="access-code">Access code</label>
+      <input
+        id="access-code"
+        v-model="accessCode"
+        type="password"
+        autocomplete="off"
+        placeholder="required to submit a prompt"
+        @blur="verifyCode"
+        @keyup.enter="verifyCode"
+      />
+      <span class="code-state" :data-state="codeState">
+        {{
+          codeState === "valid"
+            ? "accepted"
+            : codeState === "invalid"
+              ? "not valid"
+              : codeState === "checking"
+                ? "checking\u2026"
+                : ""
+        }}
+      </span>
+      <p class="lede access-note">
+        Browsing is open to everyone; submitting a prompt needs a code because it
+        costs model tokens and CPU.
+      </p>
+    </div>
     <form @submit.prevent="submit">
       <textarea
         v-model="prompt"
@@ -215,9 +274,44 @@ onUnmounted(() => poller?.abort());
 <style scoped>
 textarea,
 select,
-button {
+button,
+input {
   font: inherit;
   color: inherit;
+}
+
+.access {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+}
+
+.access input {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+}
+
+.access-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+.code-state {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.code-state[data-state="valid"] {
+  color: #1a7f37;
+}
+
+.code-state[data-state="invalid"] {
+  color: #cf222e;
 }
 
 textarea {

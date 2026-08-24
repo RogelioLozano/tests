@@ -23,6 +23,7 @@ from app.domain.errors import (
     RenderError,
     RepositoryError,
     StorageError,
+    UnauthorizedError,
     UnsafeCodeError,
     ValidationError,
 )
@@ -35,6 +36,7 @@ HTTP_429_TOO_MANY_REQUESTS = 429
 
 _STATUS_BY_ERROR: tuple[tuple[type[DomainError], int], ...] = (
     (NotFoundError, status.HTTP_404_NOT_FOUND),
+    (UnauthorizedError, status.HTTP_401_UNAUTHORIZED),
     (RateLimitedError, HTTP_429_TOO_MANY_REQUESTS),
     (UnsafeCodeError, HTTP_422_UNPROCESSABLE),
     (ValidationError, status.HTTP_400_BAD_REQUEST),

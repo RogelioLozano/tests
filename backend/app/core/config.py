@@ -159,6 +159,10 @@ class Settings:
     max_page_size: int = 100
     jobs_backend: str = "inline"
     jobs_max_workers: int = 2
+    # Shared secret gating the endpoints that cost money. Empty means open,
+    # which is what local dev and the test suite run with. repr=False so a
+    # settings dump cannot leak it.
+    api_key: str = field(default="", repr=False)
     # When set, the API also serves the built frontend, so one container is a
     # complete deployment.
     static_dir: Path | None = None
@@ -188,6 +192,7 @@ def load_settings() -> Settings:
         max_page_size=_env_int("ANIM_MAX_PAGE_SIZE", 100),
         jobs_backend=_env("ANIM_JOBS_BACKEND", "inline"),
         jobs_max_workers=max(1, _env_int("ANIM_JOBS_MAX_WORKERS", 2)),
+        api_key=os.environ.get("ANIM_API_KEY", "").strip(),
         static_dir=Path(static_raw).resolve() if static_raw else None,
         ai=AISettings(
             provider=_env("ANIM_AI_PROVIDER", "llm"),

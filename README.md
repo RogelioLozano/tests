@@ -212,6 +212,83 @@ The suite runs without Manim and without a model: the AI provider and renderer
 are replaced by fakes (`httpx.MockTransport` stands in for the chat endpoint),
 while SQLite and local storage are exercised for real.
 
+### Access control
+
+Two independent guards sit on `POST /api/v1/animations`, the only endpoint that
+spends money. Reads are deliberately left open: a portfolio piece has to be
+visible, so a visitor can watch existing animations and read the generated
+Manim source without any code at all.
+
+| | Without an access code |
+| --- | --- |
+| Browse animations, play videos, read source | open |
+| Submit a prompt | 401 |
+
+#### The access code
+
+A **shared secret**, not an identity. It is a bearer token: possession is
+permission. The server learns that the caller knows the secret, not who they
+are — which is exactly why it needs no user table, no sessions, and no login
+flow.
+
+Generate one:
+
+```bash
+openssl rand -hex 32
+```
+
+`rand -hex 32` gives 32 random bytes rendered as 64 hex characters — 256 bits
+of entropy. That matters for two reasons. It is unguessable, and
+`POST /api/v1/auth/check` (which the UI calls so a user learns immediately that
+their code is wrong, rather than after composing a prompt) is a free guessing
+oracle. Against a random 256-bit value that is worthless; against something
+memorable like `demo2024` it would not be. **Do not pick the code by hand.**
+
+Set the result as `ANIM_API_KEY` — in Render's dashboard, or your local `.env`:
+
+```bash
+ANIM_API_KEY=$(openssl rand -hex 32)
+```
+
+Leave it unset and the app runs fully open, which is the sane default locally
+and what the test suite uses.
+
+Share the code out of band with whoever you want to let in. Rotating it means
+changing that one variable; there is no per-user revocation, which is the price
+of having no account system.
+
+#### How it is checked
+
+The browser never validates the code — it *cannot*, having nothing to compare
+against. Shipping the real value into the frontend would publish it. The Vue
+app simply stores what the user types and sends it as `X-API-Key`; the server
+compares it with `secrets.compare_digest`, not `==`, because string equality
+short-circuits at the first differing byte and would leak the secret one
+character at a time to anyone timing responses.
+
+The corollary is general: **a check performed in a browser is UX, not
+security.** Anyone can edit the JavaScript, or skip the browser entirely.
+
+#### Rate limiting
+
+The code stops strangers; it does nothing about a friend running up your model
+bill. That is the rate limiter's job, and the two quotas exist because the
+endpoints cost wildly different amounts:
+
+| Bucket | Default | Protects |
+| --- | --- | --- |
+| renders (`POST` only) | 5 per 10 min | LLM tokens and CPU |
+| requests (everything else) | 300 per min | flood protection |
+
+The generous second quota is not laziness: the frontend polls a running job
+about once a second, so a limit strict enough for the first would break the UI.
+`/api/v1/health` is exempt, since the platform probes it every 30 seconds.
+
+Set `ANIM_TRUST_PROXY=true` **only** where a proxy really does set
+`X-Forwarded-For` (as Render does). Without it every visitor behind that proxy
+shares one identity and one quota; with it turned on where there is no proxy,
+a caller can forge the header for a fresh quota per request.
+
 ### Configuration
 
 All settings are environment variables prefixed `ANIM_`, read once at startup
@@ -220,18 +297,30 @@ All settings are environment variables prefixed `ANIM_`, read once at startup
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `ANIM_AI_PROVIDER` | `llm` | `llm` or `template` (offline) |
-| `ANIM_LLM_BASE_URL` | `127.0.0.1:11434/v1` | Any OpenAI-compatible endpoint |
-| `ANIM_LLM_MODEL` | `qwen2.5-coder` | Model name at that endpoint |
+| `ANIM_LLM_BASE_URL` | Groq | Any OpenAI-compatible endpoint |
+| `ANIM_LLM_MODEL` | `openai/gpt-oss-120b` | Model name at that endpoint |
 | `ANIM_LLM_API_KEY` | — | Falls back to `OPENAI_API_KEY` |
+| `ANIM_API_KEY` | — | Access code; unset means open |
 | `ANIM_AI_MAX_ATTEMPTS` | `3` | Generations per job, incl. repairs |
+| `ANIM_MAX_QUALITY` | `high` | Refuse renders above this |
 | `ANIM_OUTPUT_DIR` | `animations/output` | Root for the DB, library, scratch |
-| `ANIM_JOBS_BACKEND` | `inline` | How render jobs are executed |
+| `ANIM_JOBS_BACKEND` | `inline` | `inline` or `thread` |
+| `ANIM_JOBS_MAX_WORKERS` | `2` | Concurrent renders |
+| `ANIM_RENDER_LIMIT` | `5` | Renders per IP per window |
+| `ANIM_REQUEST_LIMIT` | `300` | Requests per IP per window |
+| `ANIM_TRUST_PROXY` | `false` | Read the client IP from `X-Forwarded-For` |
 | `ANIM_RENDER_TIMEOUT_SECONDS` | `180` | Hard limit on a single render |
 | `ANIM_LOG_FORMAT` | `json` | `json` or `text` |
 | `ANIM_CORS_ALLOW_ORIGINS` | localhost:5100 | Comma-separated allowlist |
 
-The API key is held in a `repr=False` field, so a settings dump cannot leak it
-into a log line.
+Both secrets — the model credential and the access code — are held in
+`repr=False` fields, so a settings dump cannot leak either into a log line.
+
+Note that the Docker image ships different defaults from the code
+(`thread`, one worker, `low` quality), sized so that a bare `docker run` cannot
+OOM itself on a 512 MB instance. `.env.example` deliberately leaves those
+commented, because `docker run --env-file` overrides the image's own `ENV` and
+uncommenting them would quietly undo it.
 
 Everything under `animations/output/` — the SQLite database, the rendered
 library, and scratch space — is a regenerable artifact and is git-ignored.

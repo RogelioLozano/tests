@@ -46,6 +46,12 @@ class RateLimitedError(DomainError):
         self.retry_after_seconds = retry_after_seconds
 
 
+class UnauthorizedError(DomainError):
+    """Missing or wrong credentials for an endpoint that requires them."""
+
+    code = "unauthorized"
+
+
 class GenerationError(DomainError):
     """The AI provider could not produce usable Manim source."""
 
