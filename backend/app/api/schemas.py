@@ -99,3 +99,15 @@ class ErrorResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: Literal["ok"]
     environment: str
+
+
+class CapabilitiesResponse(BaseModel):
+    """What this particular deployment can afford.
+
+    Lets the UI offer only the qualities the instance has the memory for,
+    instead of hard-coding a list that is wrong on a small box.
+    """
+
+    qualities: list[str]
+    default_quality: str
+    max_prompt_chars: int

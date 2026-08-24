@@ -1,13 +1,3 @@
----
-title: Animation Studio
-emoji: "🎬"
-colorFrom: indigo
-colorTo: purple
-sdk: docker
-app_port: 8000
-pinned: false
----
-
 # tests
 
 A repository for learning and experiments.
@@ -240,37 +230,39 @@ instance: on 512 MB, exactly one low-quality render fits.
 
 #### Hugging Face Spaces
 
-Spaces has **no separate config file** — it reads the YAML frontmatter at the
-top of this README. `sdk: docker` tells it to build the Dockerfile, `app_port`
-tells it which port to route to.
+Not viable on a free account. Their docs are explicit: *"Gradio and Docker
+Spaces run on compute and require a paid plan to create: PRO for personal
+accounts."* Only Static Spaces are free, and a static host cannot run Manim.
+The frontmatter at the top of this README is kept because it costs nothing and
+makes the Space work the moment an account has PRO.
 
-A Space is its own git repo, so push to it as a second remote:
+#### Render (free)
+
+[render.yaml](render.yaml) targets the **free** plan: 512 MB, 0.1 CPU, Docker
+builds included, no card required. It is configured around the measurements
+above:
+
+- `ANIM_MAX_QUALITY=low` — 1080p peaks near 1 GB, so it is refused up front
+  rather than attempted and OOM-killed.
+- `ANIM_JOBS_MAX_WORKERS=1` — two concurrent renders would also exceed 512 MB.
+- `ANIM_JOBS_BACKEND=thread` — at 0.1 CPU a render takes 15–25 s, which would
+  outlive the proxy timeout if it ran inline.
+
+Two accepted costs: no persistent disk, so the library and job history reset on
+every deploy and every wake from sleep; and 30–60 s cold starts after idling.
 
 ```bash
-# Create a Space at https://huggingface.co/new-space  (SDK: Docker)
-git remote add space https://huggingface.co/spaces/<user>/<space-name>
-git push space feature/manim-animation:main
+# Connect the repo at https://dashboard.render.com → New → Blueprint
+# Then set ANIM_LLM_API_KEY in the dashboard (render.yaml declares it empty).
 ```
 
-Then set `ANIM_LLM_API_KEY` under Settings → Variables and secrets. Never commit
-it; the frontmatter and `render.yaml` both deliberately omit its value.
+#### Other options
 
-Worth knowing before you push:
-
-- **Free Spaces are public.** Anyone who finds the URL can submit prompts
-  against your Groq key. Make the Space private, or add auth and rate limiting,
-  before sharing the link.
-- **Free storage is ephemeral.** The SQLite database and the video library reset
-  on every rebuild and every wake from sleep. Startup reconciliation means this
-  degrades cleanly rather than stranding jobs, but history does not survive.
-- Free CPU Basic is generously sized (2 vCPU / 16 GB at time of writing), so
-  renders run at roughly local speed and any quality fits.
-
-#### Render
-
-[render.yaml](render.yaml) is a blueprint for the same image. Kept as the paid
-escape hatch: its `disk:` mount is what makes the library survive a deploy,
-which no free tier offers. Delete it if you settle on Spaces.
+- **Oracle Cloud Always Free** — ~2 ARM cores, 12 GB, real block storage, no
+  time limit. Far more capable, but you manage the VM, and it still wants a
+  card for identity verification.
+- **Google Cloud Run** — generous free tier, but CPU is throttled between
+  requests, so `ANIM_JOBS_BACKEND` must go back to `inline`.
 
 #### Making storage survive anywhere
 

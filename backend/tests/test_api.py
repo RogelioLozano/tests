@@ -7,58 +7,11 @@ network, and in milliseconds.
 
 from __future__ import annotations
 
-import pytest
 from fastapi.testclient import TestClient
 
 from app.api.middleware import REQUEST_ID_HEADER
-from app.application.animation_service import AnimationService
-from app.application.render_pipeline import RenderPipeline
-from app.core.container import Container
-from app.core.config import ValidationSettings
 from app.domain.models import JobStatus
-from app.infrastructure.jobs.inline_queue import InlineJobQueue
-from app.infrastructure.validation.ast_validator import AstSceneCodeValidator
-from app.main import create_app
-from tests.conftest import FakeGenerator, FrozenClock, RecordingLogger, SequentialIds
-
-
-class FakeLoggerFactory:
-    def __init__(self, logger: RecordingLogger) -> None:
-        self._logger = logger
-
-    def get_logger(self, name: str) -> RecordingLogger:
-        return self._logger
-
-
-@pytest.fixture
-def client(settings, repository, storage, renderer, logger) -> TestClient:
-    pipeline = RenderPipeline(
-        jobs=repository,
-        generator=FakeGenerator(),
-        validator=AstSceneCodeValidator(ValidationSettings(), logger),
-        renderer=renderer,
-        storage=storage,
-        clock=FrozenClock(),
-        logger=logger,
-    )
-    animations = AnimationService(
-        jobs=repository,
-        queue=InlineJobQueue(pipeline, logger),
-        storage=storage,
-        clock=FrozenClock(),
-        ids=SequentialIds(),
-        logger=logger,
-        max_prompt_chars=settings.ai.max_prompt_chars,
-        max_page_size=settings.max_page_size,
-    )
-    container = Container(
-        settings=settings,
-        logger_factory=FakeLoggerFactory(logger),
-        logger=logger,
-        animations=animations,
-        migrate=lambda: None,
-    )
-    return TestClient(create_app(settings, container=container))
+from tests.conftest import RecordingLogger
 
 
 def test_health(client: TestClient) -> None:

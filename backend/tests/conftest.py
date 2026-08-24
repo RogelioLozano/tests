@@ -190,3 +190,88 @@ def settings(tmp_path: Path) -> Settings:
         database=DatabaseSettings(path=tmp_path / "metadata.db"),
         logging=LoggingSettings(level="CRITICAL", format="text"),
     )
+
+
+class FakeLoggerFactory:
+    def __init__(self, logger: RecordingLogger) -> None:
+        self._logger = logger
+
+    def get_logger(self, name: str) -> RecordingLogger:
+        return self._logger
+
+
+def build_service(
+    *, settings, repository, storage, renderer, logger, max_quality=Quality.HIGH
+):
+    """Wire the real service against fakes for the two slow/external parts."""
+    from app.application.animation_service import AnimationService
+    from app.application.render_pipeline import RenderPipeline
+    from app.infrastructure.jobs.inline_queue import InlineJobQueue
+    from app.infrastructure.validation.ast_validator import AstSceneCodeValidator
+
+    pipeline = RenderPipeline(
+        jobs=repository,
+        generator=FakeGenerator(),
+        validator=AstSceneCodeValidator(ValidationSettings(), logger),
+        renderer=renderer,
+        storage=storage,
+        clock=FrozenClock(),
+        logger=logger,
+    )
+    return AnimationService(
+        jobs=repository,
+        queue=InlineJobQueue(pipeline, logger),
+        storage=storage,
+        clock=FrozenClock(),
+        ids=SequentialIds(),
+        logger=logger,
+        max_prompt_chars=settings.ai.max_prompt_chars,
+        max_page_size=settings.max_page_size,
+        max_quality=max_quality,
+    )
+
+
+def build_client(*, settings, service, logger):
+    from fastapi.testclient import TestClient
+
+    from app.core.container import Container
+    from app.main import create_app
+
+    container = Container(
+        settings=settings,
+        logger_factory=FakeLoggerFactory(logger),
+        logger=logger,
+        animations=service,
+        migrate=lambda: None,
+    )
+    return TestClient(create_app(settings, container=container))
+
+
+@pytest.fixture
+def client(settings, repository, storage, renderer, logger):
+    service = build_service(
+        settings=settings,
+        repository=repository,
+        storage=storage,
+        renderer=renderer,
+        logger=logger,
+    )
+    return build_client(settings=settings, service=service, logger=logger)
+
+
+@pytest.fixture
+def capped_service(settings, repository, storage, renderer, logger):
+    """A deployment that can only afford low quality, like a 512 MB instance."""
+    return build_service(
+        settings=settings,
+        repository=repository,
+        storage=storage,
+        renderer=renderer,
+        logger=logger,
+        max_quality=Quality.LOW,
+    )
+
+
+@pytest.fixture
+def capped_client(settings, capped_service, logger):
+    return build_client(settings=settings, service=capped_service, logger=logger)

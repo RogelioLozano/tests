@@ -16,6 +16,7 @@ from app.application.job_recovery import JobRecovery
 from app.application.render_pipeline import RenderPipeline
 from app.core.clock import SystemClock, UuidGenerator
 from app.core.config import Settings
+from app.domain.models import Quality
 from app.domain.ports.logging import Logger, LoggerFactory
 from app.infrastructure.ai.factory import build_scene_generator
 from app.infrastructure.jobs.factory import build_job_dispatch
@@ -90,6 +91,7 @@ def build_container(settings: Settings) -> Container:
         logger=log("animations"),
         max_prompt_chars=settings.ai.max_prompt_chars,
         max_page_size=settings.max_page_size,
+        max_quality=Quality(settings.render.max_quality),
     )
 
     container = Container(

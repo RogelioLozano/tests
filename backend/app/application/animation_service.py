@@ -50,6 +50,7 @@ class AnimationService:
         logger: Logger,
         max_prompt_chars: int,
         max_page_size: int,
+        max_quality: Quality = Quality.HIGH,
     ) -> None:
         self._jobs = jobs
         self._queue = queue
@@ -59,6 +60,11 @@ class AnimationService:
         self._logger = logger
         self._max_prompt_chars = max_prompt_chars
         self._max_page_size = max_page_size
+        self._max_quality = max_quality
+
+    @property
+    def allowed_qualities(self) -> tuple[Quality, ...]:
+        return Quality.up_to(self._max_quality)
 
     def submit_prompt(self, prompt: str, quality: Quality) -> RenderJob:
         cleaned = prompt.strip()
@@ -67,6 +73,13 @@ class AnimationService:
         if len(cleaned) > self._max_prompt_chars:
             raise ValidationError(
                 f"Prompt must be at most {self._max_prompt_chars} characters"
+            )
+        if quality.exceeds(self._max_quality):
+            # Refused rather than attempted: on a small instance the render
+            # would be an OOM kill, which takes the whole service down.
+            raise ValidationError(
+                f"Quality {quality.value!r} is not available on this server; "
+                f"the maximum is {self._max_quality.value!r}"
             )
 
         now = self._clock.now()

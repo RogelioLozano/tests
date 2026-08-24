@@ -96,6 +96,9 @@ class RenderSettings:
     scratch_dir: Path = field(default=REPO_ROOT / "animations" / "output" / "scratch")
     timeout_seconds: int = 180
     default_quality: str = "low"
+    # Peak RSS per render is ~217/388/981 MB for low/medium/high. On a small
+    # instance the top of that range is an OOM kill, so it has to be refusable.
+    max_quality: str = "high"
 
 
 @dataclass(frozen=True, slots=True)
@@ -186,6 +189,7 @@ def load_settings() -> Settings:
             scratch_dir=_env_path("ANIM_RENDER_SCRATCH_DIR", output_dir / "scratch"),
             timeout_seconds=_env_int("ANIM_RENDER_TIMEOUT_SECONDS", 180),
             default_quality=_env("ANIM_DEFAULT_QUALITY", "low"),
+            max_quality=_env("ANIM_MAX_QUALITY", "high"),
         ),
         storage=StorageSettings(
             backend=_env("ANIM_STORAGE_BACKEND", "local"),

@@ -3,16 +3,17 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import {
   createAnimation,
   getAnimationSource,
+  getCapabilities,
   isTerminal,
   listAnimations,
   waitForJob,
 } from "../api/animations";
 
-const QUALITIES = [
-  { value: "low", label: "Low (fast)" },
-  { value: "medium", label: "Medium" },
-  { value: "high", label: "High (slow)" },
-];
+const QUALITY_LABELS = {
+  low: "Low (fast)",
+  medium: "Medium",
+  high: "High (slow)",
+};
 
 const STAGE_LABELS = {
   pending: "Queued",
@@ -26,6 +27,10 @@ const STAGE_LABELS = {
 
 const prompt = ref("");
 const quality = ref("low");
+// Offered qualities come from the server: a small instance has the memory for
+// low only, and picking one it cannot afford would OOM the container.
+const qualities = ref([{ value: "low", label: QUALITY_LABELS.low }]);
+const maxPromptChars = ref(1000);
 const jobs = ref([]);
 const selectedId = ref(null);
 const source = ref(null);
@@ -60,6 +65,22 @@ async function refresh() {
     }
   } catch (err) {
     error.value = err.message;
+  }
+}
+
+async function loadCapabilities() {
+  try {
+    const caps = await getCapabilities();
+    qualities.value = caps.qualities.map((value) => ({
+      value,
+      label: QUALITY_LABELS[value] ?? value,
+    }));
+    maxPromptChars.value = caps.max_prompt_chars;
+    if (!caps.qualities.includes(quality.value)) {
+      quality.value = caps.default_quality ?? caps.qualities[0];
+    }
+  } catch {
+    // Non-fatal: the default single low option is already usable.
   }
 }
 
@@ -111,6 +132,7 @@ async function showSource() {
 
 onMounted(() => {
   poller = new AbortController();
+  loadCapabilities();
   refresh();
 });
 
@@ -129,13 +151,13 @@ onUnmounted(() => poller?.abort());
       <textarea
         v-model="prompt"
         rows="3"
-        maxlength="1000"
+        :maxlength="maxPromptChars"
         placeholder="e.g. plot a sine wave in green"
         :disabled="submitting"
       ></textarea>
       <div class="controls">
-        <select v-model="quality" :disabled="submitting">
-          <option v-for="option in QUALITIES" :key="option.value" :value="option.value">
+        <select v-if="qualities.length > 1" v-model="quality" :disabled="submitting">
+          <option v-for="option in qualities" :key="option.value" :value="option.value">
             {{ option.label }}
           </option>
         </select>

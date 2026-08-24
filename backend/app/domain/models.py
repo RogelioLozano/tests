@@ -34,11 +34,29 @@ class JobStatus(str, Enum):
 
 
 class Quality(str, Enum):
-    """Render quality presets, mapped to renderer-specific flags by the adapter."""
+    """Render quality presets, mapped to renderer-specific flags by the adapter.
+
+    Ordered, because peak memory scales sharply with it — roughly 217 MB, 388 MB
+    and 981 MB — so a deployment has to be able to forbid the top of the range.
+    """
 
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
+
+    @property
+    def rank(self) -> int:
+        return _QUALITY_ORDER.index(self)
+
+    def exceeds(self, ceiling: "Quality") -> bool:
+        return self.rank > ceiling.rank
+
+    @classmethod
+    def up_to(cls, ceiling: "Quality") -> tuple["Quality", ...]:
+        return tuple(q for q in _QUALITY_ORDER if not q.exceeds(ceiling))
+
+
+_QUALITY_ORDER = (Quality.LOW, Quality.MEDIUM, Quality.HIGH)
 
 
 @dataclass(frozen=True, slots=True)

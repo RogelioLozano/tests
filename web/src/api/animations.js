@@ -27,11 +27,12 @@ export class ApiError extends Error {
 }
 
 async function request(path, options = {}) {
+  const { base = BASE, ...init } = options;
   let response;
   try {
-    response = await fetch(`${BASE}${path}`, {
-      headers: { Accept: "application/json", ...options.headers },
-      ...options,
+    response = await fetch(`${base}${path}`, {
+      headers: { Accept: "application/json", ...init.headers },
+      ...init,
     });
   } catch (cause) {
     throw new ApiError("Could not reach the server.", "network_error");
@@ -66,6 +67,11 @@ export function listAnimations({ limit = 20, offset = 0 } = {}) {
 
 export function getAnimationSource(id) {
   return request(`/${encodeURIComponent(id)}/source`);
+}
+
+/** What this deployment supports; a small instance cannot afford every quality. */
+export function getCapabilities() {
+  return request("/capabilities", { base: "/api/v1" });
 }
 
 /** Poll until the job reaches a terminal state, reporting each change. */
