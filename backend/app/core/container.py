@@ -12,12 +12,13 @@ from dataclasses import dataclass
 from typing import Callable
 
 from app.application.animation_service import AnimationService
+from app.application.job_recovery import JobRecovery
 from app.application.render_pipeline import RenderPipeline
 from app.core.clock import SystemClock, UuidGenerator
 from app.core.config import Settings
 from app.domain.ports.logging import Logger, LoggerFactory
 from app.infrastructure.ai.factory import build_scene_generator
-from app.infrastructure.jobs.factory import build_job_queue
+from app.infrastructure.jobs.factory import build_job_dispatch
 from app.infrastructure.logging.factory import build_logger_factory
 from app.infrastructure.persistence.factory import build_persistence
 from app.infrastructure.rendering.factory import build_renderer
@@ -32,9 +33,14 @@ class Container:
     logger: Logger
     animations: AnimationService
     migrate: Callable[[], None]
+    drain: Callable[[], None] = lambda: None
+    recover: Callable[[], int] = lambda: 0
 
     def startup(self) -> None:
         self.migrate()
+        # Before any new work is accepted, so a client polling a job stranded by
+        # the previous run gets an answer immediately.
+        self.recover()
         self.logger.info(
             "app.started",
             environment=self.settings.environment,
@@ -44,6 +50,10 @@ class Container:
             database_backend=self.settings.database.backend,
             jobs_backend=self.settings.jobs_backend,
         )
+
+    def shutdown(self) -> None:
+        self.drain()
+        self.logger.info("app.stopped")
 
 
 def build_container(settings: Settings) -> Container:
@@ -67,11 +77,13 @@ def build_container(settings: Settings) -> Container:
         logger=log("pipeline"),
         max_attempts=settings.ai.max_attempts,
     )
-    queue = build_job_queue(settings.jobs_backend, pipeline, log("jobs"))
+    dispatch = build_job_dispatch(
+        settings.jobs_backend, pipeline, log("jobs"), settings.jobs_max_workers
+    )
 
     animations = AnimationService(
         jobs=persistence.jobs,
-        queue=queue,
+        queue=dispatch.queue,
         storage=storage,
         clock=clock,
         ids=UuidGenerator(),
@@ -86,5 +98,9 @@ def build_container(settings: Settings) -> Container:
         logger=log("app"),
         animations=animations,
         migrate=persistence.initialise,
+        drain=dispatch.shutdown,
+        recover=JobRecovery(
+            jobs=persistence.jobs, clock=clock, logger=log("recovery")
+        ).reconcile,
     )
     return container

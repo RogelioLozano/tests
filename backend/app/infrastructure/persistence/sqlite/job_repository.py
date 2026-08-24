@@ -84,6 +84,17 @@ class SqliteRenderJobRepository:
             ).fetchall()
         return [_from_row(row) for row in rows]
 
+    def find_unfinished(self, *, limit: int) -> Sequence[RenderJob]:
+        terminal = [status.value for status in JobStatus if status.is_terminal]
+        placeholders = ", ".join("?" for _ in terminal)
+        with self._database.connect() as connection:
+            rows = connection.execute(
+                f"{_SELECT} WHERE status NOT IN ({placeholders}) "
+                "ORDER BY created_at ASC LIMIT ?",
+                (*terminal, limit),
+            ).fetchall()
+        return [_from_row(row) for row in rows]
+
     def count(self) -> int:
         with self._database.connect() as connection:
             return connection.execute("SELECT COUNT(*) FROM render_jobs").fetchone()[0]

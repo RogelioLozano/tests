@@ -17,4 +17,4 @@ HOST="${ANIM_HOST:-127.0.0.1}"
 PORT="${ANIM_PORT:-8000}"
 
 cd backend
-exec "../$PYTHON" -m uvicorn app.main:app --host "$HOST" --port "$PORT" "$@"
+exec "../$PYTHON" -m uvicorn app.main:create_app --factory --host "$HOST" --port "$PORT" "$@"

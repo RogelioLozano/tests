@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.errors import register_error_handlers
 from app.api.middleware import REQUEST_ID_HEADER, RequestLoggingMiddleware
+from app.api.static import mount_frontend
 from app.api.v1.router import router as v1_router
 from app.core.config import Settings, load_settings
 from app.core.container import Container, build_container
@@ -31,7 +32,7 @@ def create_app(
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         container.startup()
         yield
-        container.logger.info("app.stopped")
+        container.shutdown()
 
     app = FastAPI(
         title="Animation Studio API",
@@ -56,7 +57,14 @@ def create_app(
     )
     register_error_handlers(app, container.logger_factory.get_logger("http"))
     app.include_router(v1_router)
+    # Registered last: its catch-all must not shadow an API route.
+    if settings.static_dir is not None:
+        mount_frontend(
+            app, settings.static_dir, container.logger_factory.get_logger("static")
+        )
     return app
 
 
-app = create_app()
+# No module-level `app = create_app()`: that would build the container, open
+# the database, and validate credentials on mere import. Served with
+# `uvicorn app.main:create_app --factory`.

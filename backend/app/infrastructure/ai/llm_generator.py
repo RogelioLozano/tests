@@ -45,7 +45,10 @@ compile, or input.
 8. No file, network, or process access of any kind.
 9. Keep the animation under 20 seconds. End with self.wait(0.5) or a FadeOut.
 10. Use only documented Manim CE APIs. Prefer Create, Write, Transform, \
-FadeIn, FadeOut, .animate, Axes.plot, Text, MathTex.
+FadeIn, FadeOut, .animate, Axes.plot, Text.
+11. Never use MathTex, Tex, or anything else requiring LaTeX — it is not \
+installed and the render will fail. Use Text for all labels, including \
+formulas.
 
 Example of a correct response:
 from manim import *

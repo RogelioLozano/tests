@@ -1,6 +1,20 @@
+---
+title: Animation Studio
+emoji: "🎬"
+colorFrom: indigo
+colorTo: purple
+sdk: docker
+app_port: 8000
+pinned: false
+---
+
 # tests
 
 A repository for learning and experiments.
+
+<!-- The YAML block above is Hugging Face Spaces configuration. Spaces has no
+     separate config file: it reads frontmatter from this README. GitHub renders
+     it as a small table and otherwise ignores it. -->
 
 ## Local HTTPS setup
 
@@ -94,11 +108,27 @@ instead. It needs no model and is what the test suite runs against.
 ### Render jobs
 
 `POST /api/v1/animations` answers **202** with a job, and clients poll
-`GET /api/v1/animations/{id}`. The inline queue finishes the work before the
-response is written, but nothing in the contract says so — moving to background
-workers is a change of `ANIM_JOBS_BACKEND` and needs no edit to the API or the
-frontend. Statuses: `pending → generating → validating → rendering → storing →
-succeeded | failed`.
+`GET /api/v1/animations/{id}`. Statuses: `pending → generating → validating →
+rendering → storing → succeeded | failed`.
+
+Nothing in the contract says when the work happens, which is what makes
+`ANIM_JOBS_BACKEND` an operational choice rather than a design one:
+
+- `inline` — renders on the request thread. Fine locally; behind a cloud load
+  balancer the request would outlive the proxy timeout.
+- `thread` — bounded background pool, `enqueue` returns immediately. Use this
+  when deployed. Concurrency is capped because rendering is CPU-bound.
+
+A broker-backed adapter (Celery/arq/SQS) joins as a third entry without the API
+or the frontend changing.
+
+**Restart safety.** A job is written as `rendering` before Manim is invoked, so
+a deploy, OOM kill, or free-tier spin-down in between would strand that row
+non-terminal forever and a polling client would wait forever. Startup fails
+every non-terminal job with `interrupted` before accepting traffic. That is
+correct because the deployment is single-process; under a multi-worker broker
+it would need to become a lease or heartbeat check instead
+(`application/job_recovery.py`).
 
 ### Executing generated code
 
@@ -195,6 +225,60 @@ into a log line.
 
 Everything under `animations/output/` — the SQLite database, the rendered
 library, and scratch space — is a regenerable artifact and is git-ignored.
+
+### Deploying
+
+One container holds everything: the API, the Manim system libraries, and the
+built Vue bundle (`ANIM_STATIC_DIR`), so frontend and API share an origin and
+CORS drops out of the picture. The LLM is not in the image — it is an outbound
+HTTPS call to Groq, which is what keeps this deployable on a free tier.
+
+Sizing is measured, not guessed. Peak RSS per render: **low 217 MB**, medium
+388 MB, high **981 MB**, against a 37 MB idle API process. RAM is the binding
+constraint and it scales with quality, so `ANIM_JOBS_MAX_WORKERS` must match the
+instance: on 512 MB, exactly one low-quality render fits.
+
+#### Hugging Face Spaces
+
+Spaces has **no separate config file** — it reads the YAML frontmatter at the
+top of this README. `sdk: docker` tells it to build the Dockerfile, `app_port`
+tells it which port to route to.
+
+A Space is its own git repo, so push to it as a second remote:
+
+```bash
+# Create a Space at https://huggingface.co/new-space  (SDK: Docker)
+git remote add space https://huggingface.co/spaces/<user>/<space-name>
+git push space feature/manim-animation:main
+```
+
+Then set `ANIM_LLM_API_KEY` under Settings → Variables and secrets. Never commit
+it; the frontmatter and `render.yaml` both deliberately omit its value.
+
+Worth knowing before you push:
+
+- **Free Spaces are public.** Anyone who finds the URL can submit prompts
+  against your Groq key. Make the Space private, or add auth and rate limiting,
+  before sharing the link.
+- **Free storage is ephemeral.** The SQLite database and the video library reset
+  on every rebuild and every wake from sleep. Startup reconciliation means this
+  degrades cleanly rather than stranding jobs, but history does not survive.
+- Free CPU Basic is generously sized (2 vCPU / 16 GB at time of writing), so
+  renders run at roughly local speed and any quality fits.
+
+#### Render
+
+[render.yaml](render.yaml) is a blueprint for the same image. Kept as the paid
+escape hatch: its `disk:` mount is what makes the library survive a deploy,
+which no free tier offers. Delete it if you settle on Spaces.
+
+#### Making storage survive anywhere
+
+The database and the videos are the only stateful pieces, and both sit behind
+ports. Pointing `ArtifactStorage` at S3-compatible object storage and
+`RenderJobRepository` at hosted Postgres makes the container fully disposable —
+a composition-root change plus one adapter each, with no edit to the pipeline,
+the API, or the frontend.
 
 ### Rendering a scene by hand
 

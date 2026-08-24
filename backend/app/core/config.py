@@ -57,13 +57,13 @@ def _env_list(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
 class LLMSettings:
     """Any provider speaking OpenAI's /chat/completions shape.
 
-    Defaults point at a local Ollama, so the out-of-the-box path costs nothing
-    and sends no prompt off the machine.
+    Defaults target Groq: hosted, so the container needs no GPU and no model
+    weights, which is what makes the image small enough to deploy anywhere.
     """
 
-    base_url: str = "http://127.0.0.1:11434/v1"
-    model: str = "qwen2.5-coder"
-    provider_label: str = "ollama"
+    base_url: str = "https://api.groq.com/openai/v1"
+    model: str = "llama-3.3-70b-versatile"
+    provider_label: str = "groq"
     # repr=False so a settings dump can never put the key in a log line.
     api_key: str = field(default="", repr=False)
     timeout_seconds: float = 90.0
@@ -125,6 +125,10 @@ class Settings:
     cors_allow_origins: tuple[str, ...] = ("http://localhost:5100", "http://127.0.0.1:5100")
     max_page_size: int = 100
     jobs_backend: str = "inline"
+    jobs_max_workers: int = 2
+    # When set, the API also serves the built frontend, so one container is a
+    # complete deployment.
+    static_dir: Path | None = None
     ai: AISettings = field(default_factory=AISettings)
     validation: ValidationSettings = field(default_factory=ValidationSettings)
     render: RenderSettings = field(default_factory=RenderSettings)
@@ -140,6 +144,7 @@ def load_settings() -> Settings:
     server and Manim already read.
     """
     output_dir = _env_path("ANIM_OUTPUT_DIR", REPO_ROOT / "animations" / "output")
+    static_raw = os.environ.get("ANIM_STATIC_DIR", "").strip()
     return Settings(
         environment=_env("ANIM_ENV", "local"),
         cors_allow_origins=_env_list(
@@ -148,15 +153,17 @@ def load_settings() -> Settings:
         ),
         max_page_size=_env_int("ANIM_MAX_PAGE_SIZE", 100),
         jobs_backend=_env("ANIM_JOBS_BACKEND", "inline"),
+        jobs_max_workers=max(1, _env_int("ANIM_JOBS_MAX_WORKERS", 2)),
+        static_dir=Path(static_raw).resolve() if static_raw else None,
         ai=AISettings(
             provider=_env("ANIM_AI_PROVIDER", "llm"),
             model=_env("ANIM_AI_MODEL", "manim-templates-v1"),
             max_prompt_chars=_env_int("ANIM_MAX_PROMPT_CHARS", 1_000),
             max_attempts=max(1, _env_int("ANIM_AI_MAX_ATTEMPTS", 3)),
             llm=LLMSettings(
-                base_url=_env("ANIM_LLM_BASE_URL", "http://127.0.0.1:11434/v1"),
-                model=_env("ANIM_LLM_MODEL", "qwen2.5-coder"),
-                provider_label=_env("ANIM_LLM_PROVIDER_LABEL", "ollama"),
+                base_url=_env("ANIM_LLM_BASE_URL", "https://api.groq.com/openai/v1"),
+                model=_env("ANIM_LLM_MODEL", "llama-3.3-70b-versatile"),
+                provider_label=_env("ANIM_LLM_PROVIDER_LABEL", "groq"),
                 # Falls back to the conventional variable so an existing
                 # OPENAI_API_KEY in the shell just works.
                 api_key=os.environ.get("ANIM_LLM_API_KEY")

@@ -28,4 +28,11 @@ class RenderJobRepository(Protocol):
         """Most recently created jobs first."""
         ...
 
+    def find_unfinished(self, *, limit: int) -> Sequence[RenderJob]:
+        """Jobs in a non-terminal state, oldest first.
+
+        After a restart these are jobs nobody is working on any more.
+        """
+        ...
+
     def count(self) -> int: ...
