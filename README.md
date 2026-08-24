@@ -67,20 +67,26 @@ environment variables — see `.env.example`.
 
 | Provider | Cost | `ANIM_LLM_BASE_URL` |
 | --- | --- | --- |
-| **Ollama** (default) | Free, offline, no key | `http://127.0.0.1:11434/v1` |
-| Groq | Free tier | `https://api.groq.com/openai/v1` |
+| **Groq** (default) | Free tier | `https://api.groq.com/openai/v1` |
+| Ollama | Free, offline, no key | `http://127.0.0.1:11434/v1` |
 | Google AI Studio | Free tier | `https://generativelanguage.googleapis.com/v1beta/openai` |
 | Cerebras | Free tier | `https://api.cerebras.ai/v1` |
 | OpenRouter | Has `:free` models | `https://openrouter.ai/api/v1` |
 | OpenAI | Paid | `https://api.openai.com/v1` |
 | DeepSeek | Paid, cheap | `https://api.deepseek.com` |
 
-The default is a local Ollama, so nothing leaves the machine and no credential
-is needed:
+The default is `openai/gpt-oss-120b` on Groq. **Model IDs churn** — providers
+retire them without much notice — so if a render fails with "Model ... was not
+found", list what your key can actually see:
 
 ```bash
-brew install ollama && ollama pull qwen2.5-coder
+curl -s -H "Authorization: Bearer $ANIM_LLM_API_KEY" \
+  https://api.groq.com/openai/v1/models | python3 -m json.tool
 ```
+
+Not every model on that list is usable here. Smaller reasoning models tend to
+spend their token budget thinking and return either no code or a completion
+truncated mid-string, which the validator sees as a syntax error.
 
 Point `ANIM_LLM_BASE_URL` at a remote host without setting `ANIM_LLM_API_KEY`
 and the app refuses to start, rather than failing as a 401 mid-render.

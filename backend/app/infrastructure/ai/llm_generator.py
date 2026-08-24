@@ -46,9 +46,11 @@ compile, or input.
 9. Keep the animation under 20 seconds. End with self.wait(0.5) or a FadeOut.
 10. Use only documented Manim CE APIs. Prefer Create, Write, Transform, \
 FadeIn, FadeOut, .animate, Axes.plot, Text.
-11. Never use MathTex, Tex, or anything else requiring LaTeX — it is not \
-installed and the render will fail. Use Text for all labels, including \
-formulas.
+11. LaTeX is NOT installed. Anything that renders through it will crash the \
+render. Never use: Tex, MathTex, Title, BulletedList, DecimalNumber, Integer, \
+Matrix, Variable, .add_coordinates(), .get_axis_labels(), .get_graph_label(), \
+or include_numbers=True. Write every label, formula and number with Text(...), \
+e.g. Text("x^2 + 1") rather than MathTex("x^2 + 1").
 
 Example of a correct response:
 from manim import *

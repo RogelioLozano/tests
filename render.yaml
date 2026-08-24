@@ -46,7 +46,7 @@ services:
       - key: ANIM_LLM_BASE_URL
         value: https://api.groq.com/openai/v1
       - key: ANIM_LLM_MODEL
-        value: llama-3.3-70b-versatile
+        value: openai/gpt-oss-120b
       - key: ANIM_LLM_PROVIDER_LABEL
         value: groq
       - key: ANIM_JOBS_BACKEND

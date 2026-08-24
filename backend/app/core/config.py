@@ -8,6 +8,7 @@ component can be constructed with different settings in a test.
 from __future__ import annotations
 
 import os
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -53,6 +54,13 @@ def _env_list(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(item.strip() for item in raw.split(",") if item.strip())
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
 @dataclass(frozen=True, slots=True)
 class LLMSettings:
     """Any provider speaking OpenAI's /chat/completions shape.
@@ -62,13 +70,15 @@ class LLMSettings:
     """
 
     base_url: str = "https://api.groq.com/openai/v1"
-    model: str = "llama-3.3-70b-versatile"
+    model: str = "openai/gpt-oss-120b"
     provider_label: str = "groq"
     # repr=False so a settings dump can never put the key in a log line.
     api_key: str = field(default="", repr=False)
     timeout_seconds: float = 90.0
     temperature: float = 0.2
-    max_tokens: int = 1_500
+    # Generous, because a truncated completion is an unterminated string that
+    # fails validation as a syntax error, wasting a whole repair attempt.
+    max_tokens: int = 2_500
     max_prompt_chars: int = 1_000
 
 
@@ -88,6 +98,10 @@ class ValidationSettings:
     max_code_chars: int = 20_000
     max_ast_nodes: int = 4_000
     allowed_imports: tuple[str, ...] = ("manim", "numpy", "math")
+    # Manim shells out to `latex` for Tex/MathTex. The container ships without
+    # texlive (it would add ~1 GB), so those mobjects have to be rejected
+    # before the render rather than blowing up inside it.
+    latex_available: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,7 +179,7 @@ def load_settings() -> Settings:
             max_attempts=max(1, _env_int("ANIM_AI_MAX_ATTEMPTS", 3)),
             llm=LLMSettings(
                 base_url=_env("ANIM_LLM_BASE_URL", "https://api.groq.com/openai/v1"),
-                model=_env("ANIM_LLM_MODEL", "llama-3.3-70b-versatile"),
+                model=_env("ANIM_LLM_MODEL", "openai/gpt-oss-120b"),
                 provider_label=_env("ANIM_LLM_PROVIDER_LABEL", "groq"),
                 # Falls back to the conventional variable so an existing
                 # OPENAI_API_KEY in the shell just works.
@@ -173,7 +187,7 @@ def load_settings() -> Settings:
                 or os.environ.get("OPENAI_API_KEY", ""),
                 timeout_seconds=_env_float("ANIM_LLM_TIMEOUT_SECONDS", 90.0),
                 temperature=_env_float("ANIM_LLM_TEMPERATURE", 0.2),
-                max_tokens=_env_int("ANIM_LLM_MAX_TOKENS", 1_500),
+                max_tokens=_env_int("ANIM_LLM_MAX_TOKENS", 2_500),
                 max_prompt_chars=_env_int("ANIM_MAX_PROMPT_CHARS", 1_000),
             ),
         ),
@@ -182,6 +196,11 @@ def load_settings() -> Settings:
             max_ast_nodes=_env_int("ANIM_MAX_AST_NODES", 4_000),
             allowed_imports=_env_list(
                 "ANIM_ALLOWED_IMPORTS", ("manim", "numpy", "math")
+            ),
+            # Detected rather than assumed, so installing texlive is enough to
+            # unlock MathTex with no config change.
+            latex_available=_env_bool(
+                "ANIM_LATEX_AVAILABLE", shutil.which("latex") is not None
             ),
         ),
         render=RenderSettings(

@@ -100,6 +100,41 @@ FORBIDDEN_ATTRIBUTES = frozenset(
 )
 
 
+# Manim mobjects that shell out to `latex`. Without texlive installed these
+# raise FileNotFoundError deep inside the render, so they are rejected here
+# where the message can be fed back to the model instead.
+LATEX_NAMES = frozenset(
+    {
+        "BulletedList",
+        "DecimalMatrix",
+        "DecimalNumber",
+        "DecimalTable",
+        "Integer",
+        "IntegerMatrix",
+        "IntegerTable",
+        "MathTable",
+        "MathTex",
+        "Matrix",
+        "MobjectMatrix",
+        "SingleStringMathTex",
+        "Tex",
+        "TexTemplate",
+        "Title",
+        "Variable",
+    }
+)
+
+# Methods that build LaTeX labels internally.
+LATEX_ATTRIBUTES = frozenset(
+    {"add_coordinates", "get_axis_labels", "get_graph_label", "get_field_label"}
+)
+
+# Axes(..., include_numbers=True) renders tick labels with DecimalNumber.
+LATEX_KEYWORDS = frozenset({"include_numbers", "add_coordinates"})
+
+_USE_TEXT = "use Text(...) instead"
+
+
 class AstSceneCodeValidator:
     """Allowlist validator over the abstract syntax tree."""
 
@@ -231,6 +266,7 @@ class AstSceneCodeValidator:
 
     def _check_nodes(self, nodes: list[ast.AST]) -> Iterator[ValidationIssue]:
         allowed_imports = frozenset(self._settings.allowed_imports)
+        latex = self._settings.latex_available
         for node in nodes:
             line = getattr(node, "lineno", None)
 
@@ -261,6 +297,25 @@ class AstSceneCodeValidator:
                     yield ValidationIssue(
                         "forbidden_name", f"Use of {node.id!r} is not allowed", line
                     )
+                elif not latex and node.id in LATEX_NAMES:
+                    yield ValidationIssue(
+                        "latex_unavailable",
+                        f"{node.id} requires LaTeX, which is not installed; "
+                        f"{_USE_TEXT}",
+                        line,
+                    )
+            elif isinstance(node, ast.keyword):
+                if (
+                    not latex
+                    and node.arg in LATEX_KEYWORDS
+                    and getattr(node.value, "value", False) is True
+                ):
+                    yield ValidationIssue(
+                        "latex_unavailable",
+                        f"{node.arg}=True renders labels with LaTeX, which is "
+                        f"not installed; omit it and add Text labels instead",
+                        line,
+                    )
             elif isinstance(node, ast.Attribute):
                 if node.attr.startswith("_"):
                     yield ValidationIssue(
@@ -272,6 +327,13 @@ class AstSceneCodeValidator:
                     yield ValidationIssue(
                         "forbidden_attribute",
                         f"Access to {node.attr!r} is not allowed",
+                        line,
+                    )
+                elif not latex and node.attr in LATEX_ATTRIBUTES:
+                    yield ValidationIssue(
+                        "latex_unavailable",
+                        f"{node.attr}() builds LaTeX labels, which is not "
+                        f"available; {_USE_TEXT}",
                         line,
                     )
             elif isinstance(node, ast.While):
