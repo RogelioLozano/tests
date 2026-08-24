@@ -66,6 +66,20 @@ services:
         value: "300" # 0.1 CPU is slow; give a render room to finish
       - key: ANIM_AI_MAX_ATTEMPTS
         value: "3"
+      # Behind Render's proxy the socket address is the proxy's, so without
+      # this every visitor shares one identity and one quota. Only safe to
+      # enable because a proxy really does set X-Forwarded-For here.
+      - key: ANIM_TRUST_PROXY
+        value: "true"
+      # Renders cost Groq tokens and CPU; polling and page loads do not.
+      - key: ANIM_RENDER_LIMIT
+        value: "5"
+      - key: ANIM_RENDER_LIMIT_WINDOW
+        value: "600"
+      - key: ANIM_REQUEST_LIMIT
+        value: "300"
+      - key: ANIM_REQUEST_LIMIT_WINDOW
+        value: "60"
       # Frontend is served from the same container, so same-origin: no CORS
       # entry needed. Add origins here only if you split them apart.
       - key: ANIM_CORS_ALLOW_ORIGINS

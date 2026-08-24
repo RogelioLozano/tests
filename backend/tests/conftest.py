@@ -231,7 +231,7 @@ def build_service(
     )
 
 
-def build_client(*, settings, service, logger):
+def build_client(*, settings, service, logger, rate_limiter=None):
     from fastapi.testclient import TestClient
 
     from app.core.container import Container
@@ -243,6 +243,7 @@ def build_client(*, settings, service, logger):
         logger=logger,
         animations=service,
         migrate=lambda: None,
+        rate_limiter=rate_limiter,
     )
     return TestClient(create_app(settings, container=container))
 

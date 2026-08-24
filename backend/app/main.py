@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.errors import register_error_handlers
 from app.api.middleware import REQUEST_ID_HEADER, RequestLoggingMiddleware
+from app.api.rate_limit import RateLimitMiddleware
 from app.api.static import mount_frontend
 from app.api.v1.router import router as v1_router
 from app.core.config import Settings, load_settings
@@ -55,6 +56,15 @@ def create_app(
     app.add_middleware(
         RequestLoggingMiddleware, logger=container.logger_factory.get_logger("http")
     )
+    if container.rate_limiter is not None:
+        # Added after the logger, so it runs first and a flood is rejected
+        # before anything else does work for it.
+        app.add_middleware(
+            RateLimitMiddleware,
+            limiter=container.rate_limiter,
+            logger=container.logger_factory.get_logger("ratelimit"),
+            trust_proxy=settings.rate_limit.trust_proxy,
+        )
     register_error_handlers(app, container.logger_factory.get_logger("http"))
     app.include_router(v1_router)
     # Registered last: its catch-all must not shadow an API route.

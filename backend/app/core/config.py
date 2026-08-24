@@ -129,6 +129,22 @@ class DatabaseSettings:
 
 
 @dataclass(frozen=True, slots=True)
+class RateLimitSettings:
+    backend: str = "memory"
+    # Renders cost LLM tokens and CPU seconds, so this is the quota that
+    # actually protects the bill.
+    render_limit: int = 5
+    render_window_seconds: int = 600
+    # Generous: the frontend polls a job roughly once a second while it runs.
+    request_limit: int = 300
+    request_window_seconds: int = 60
+    max_identities: int = 10_000
+    # Only enable where a proxy really does set X-Forwarded-For, otherwise a
+    # caller can forge it and get a fresh quota per request.
+    trust_proxy: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class LoggingSettings:
     backend: str = "stdlib"
     level: str = "INFO"
@@ -152,6 +168,7 @@ class Settings:
     storage: StorageSettings = field(default_factory=StorageSettings)
     database: DatabaseSettings = field(default_factory=DatabaseSettings)
     logging: LoggingSettings = field(default_factory=LoggingSettings)
+    rate_limit: RateLimitSettings = field(default_factory=RateLimitSettings)
 
 
 def load_settings() -> Settings:
@@ -224,5 +241,14 @@ def load_settings() -> Settings:
             level=_env("ANIM_LOG_LEVEL", "INFO").upper(),
             format=_env("ANIM_LOG_FORMAT", "json"),
             service_name=_env("ANIM_SERVICE_NAME", "animation-studio"),
+        ),
+        rate_limit=RateLimitSettings(
+            backend=_env("ANIM_RATE_LIMIT_BACKEND", "memory"),
+            render_limit=_env_int("ANIM_RENDER_LIMIT", 5),
+            render_window_seconds=_env_int("ANIM_RENDER_LIMIT_WINDOW", 600),
+            request_limit=_env_int("ANIM_REQUEST_LIMIT", 300),
+            request_window_seconds=_env_int("ANIM_REQUEST_LIMIT_WINDOW", 60),
+            max_identities=_env_int("ANIM_RATE_LIMIT_MAX_IDENTITIES", 10_000),
+            trust_proxy=_env_bool("ANIM_TRUST_PROXY", False),
         ),
     )

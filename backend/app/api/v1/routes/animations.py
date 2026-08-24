@@ -14,7 +14,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Query, status
 from fastapi.responses import RedirectResponse, StreamingResponse
 
-from app.api.deps import AnimationServiceDep
+from app.api.deps import AnimationServiceDep, RenderQuota
 from app.api.schemas import (
     AnimationJobListResponse,
     AnimationJobResponse,
@@ -32,6 +32,7 @@ _STREAM_CHUNK = 64 * 1024
     response_model=AnimationJobResponse,
     status_code=status.HTTP_202_ACCEPTED,
     summary="Submit a prompt and start a render job",
+    dependencies=[RenderQuota],
 )
 def create_animation(
     payload: CreateAnimationRequest, service: AnimationServiceDep

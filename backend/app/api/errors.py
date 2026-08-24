@@ -19,6 +19,7 @@ from app.domain.errors import (
     DomainError,
     GenerationError,
     NotFoundError,
+    RateLimitedError,
     RenderError,
     RepositoryError,
     StorageError,
@@ -30,9 +31,11 @@ from app.domain.ports.logging import Logger
 # Spelled numerically: Starlette renamed its 422 constant, and the number is
 # the part of the contract clients actually see.
 HTTP_422_UNPROCESSABLE = 422
+HTTP_429_TOO_MANY_REQUESTS = 429
 
 _STATUS_BY_ERROR: tuple[tuple[type[DomainError], int], ...] = (
     (NotFoundError, status.HTTP_404_NOT_FOUND),
+    (RateLimitedError, HTTP_429_TOO_MANY_REQUESTS),
     (UnsafeCodeError, HTTP_422_UNPROCESSABLE),
     (ValidationError, status.HTTP_400_BAD_REQUEST),
     (GenerationError, status.HTTP_502_BAD_GATEWAY),
@@ -65,7 +68,10 @@ def register_error_handlers(app: FastAPI, logger: Logger) -> None:
         status_code = _status_for(exc)
         log = logger.error if status_code >= 500 else logger.warning
         log("request.domain_error", error_code=exc.code, error_message=exc.message)
-        return _body(exc.code, exc.message, status_code)
+        response = _body(exc.code, exc.message, status_code)
+        if isinstance(exc, RateLimitedError):
+            response.headers["Retry-After"] = str(exc.retry_after_seconds)
+        return response
 
     @app.exception_handler(RequestValidationError)
     async def handle_request_validation(

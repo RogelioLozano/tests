@@ -18,10 +18,12 @@ from app.core.clock import SystemClock, UuidGenerator
 from app.core.config import Settings
 from app.domain.models import Quality
 from app.domain.ports.logging import Logger, LoggerFactory
+from app.domain.ports.rate_limit import RateLimiter
 from app.infrastructure.ai.factory import build_scene_generator
 from app.infrastructure.jobs.factory import build_job_dispatch
 from app.infrastructure.logging.factory import build_logger_factory
 from app.infrastructure.persistence.factory import build_persistence
+from app.infrastructure.rate_limit.factory import build_rate_limiter
 from app.infrastructure.rendering.factory import build_renderer
 from app.infrastructure.storage.factory import build_storage
 from app.infrastructure.validation.ast_validator import AstSceneCodeValidator
@@ -34,6 +36,7 @@ class Container:
     logger: Logger
     animations: AnimationService
     migrate: Callable[[], None]
+    rate_limiter: RateLimiter | None = None
     drain: Callable[[], None] = lambda: None
     recover: Callable[[], int] = lambda: 0
 
@@ -100,6 +103,7 @@ def build_container(settings: Settings) -> Container:
         logger=log("app"),
         animations=animations,
         migrate=persistence.initialise,
+        rate_limiter=build_rate_limiter(settings.rate_limit, log("ratelimit")),
         drain=dispatch.shutdown,
         recover=JobRecovery(
             jobs=persistence.jobs, clock=clock, logger=log("recovery")
