@@ -1,0 +1,92 @@
+# Render blueprint: https://render.com/docs/blueprint-spec
+#
+# Configured for the FREE plan (512 MB, 0.1 CPU, no persistent disk, sleeps
+# after ~15 min idle). Docker builds are included on the free Hobby tier.
+#
+# Sizing, measured rather than guessed (peak RSS of one render):
+#   API process idle    37 MB   (Manim runs in a subprocess, so the web
+#                                process never imports it)
+#   low     480p15      217 MB
+#   medium  720p30      388 MB
+#   high    1080p60     981 MB
+#
+# RAM is the binding constraint, not CPU, and it scales with quality. Hence
+# ANIM_MAX_QUALITY=low and one worker: two concurrent low renders (~494 MB) or
+# a single high-quality one (~1 GB) would be OOM-killed.
+#
+# At 0.1 CPU a low render takes roughly 15-25 s rather than the ~2 s it takes
+# locally. That is survivable only because ANIM_JOBS_BACKEND=thread returns
+# immediately and the frontend polls; inline would outlive the proxy timeout.
+#
+# Two known costs of the free plan, both accepted deliberately:
+#   1. No disk. The SQLite database and the video library live on the container
+#      filesystem and reset on every deploy and every wake from sleep. Startup
+#      reconciliation fails any job stranded by that, so it degrades cleanly.
+#   2. Cold starts of 30-60 s after idling.
+#
+# To fix (1), either move to plan: starter and re-add the disk: block below, or
+# point ArtifactStorage at object storage and RenderJobRepository at hosted
+# Postgres. Both are behind ports, so that is a composition-root change.
+#
+#   plan: starter
+#   disk:
+#     name: anim-data
+#     mountPath: /data
+#     sizeGB: 5
+
+services:
+  - type: web
+    name: animation-studio
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: ANIM_LLM_API_KEY
+        sync: false # set in the dashboard; never commit a key
+      # Shared access code gating prompt submission. Reads stay open, so the
+      # demo is visible to anyone while only the paid path needs the code.
+      # Generate with: openssl rand -hex 32
+      # Leave unset to run fully open.
+      - key: ANIM_API_KEY
+        sync: false
+      - key: ANIM_LLM_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: ANIM_LLM_MODEL
+        value: openai/gpt-oss-120b
+      - key: ANIM_LLM_PROVIDER_LABEL
+        value: groq
+      - key: ANIM_JOBS_BACKEND
+        value: thread
+      # One render at a time: a second concurrent low-quality render would take
+      # the container past 512 MB.
+      - key: ANIM_JOBS_MAX_WORKERS
+        value: "1"
+      # 981 MB for a 1080p render against a 512 MB instance. Refused up front
+      # rather than attempted and OOM-killed.
+      - key: ANIM_MAX_QUALITY
+        value: low
+      # No disk on the free plan, so this is container-local and ephemeral.
+      - key: ANIM_OUTPUT_DIR
+        value: /data
+      - key: ANIM_RENDER_TIMEOUT_SECONDS
+        value: "300" # 0.1 CPU is slow; give a render room to finish
+      - key: ANIM_AI_MAX_ATTEMPTS
+        value: "3"
+      # Behind Render's proxy the socket address is the proxy's, so without
+      # this every visitor shares one identity and one quota. Only safe to
+      # enable because a proxy really does set X-Forwarded-For here.
+      - key: ANIM_TRUST_PROXY
+        value: "true"
+      # Renders cost Groq tokens and CPU; polling and page loads do not.
+      - key: ANIM_RENDER_LIMIT
+        value: "5"
+      - key: ANIM_RENDER_LIMIT_WINDOW
+        value: "600"
+      - key: ANIM_REQUEST_LIMIT
+        value: "300"
+      - key: ANIM_REQUEST_LIMIT_WINDOW
+        value: "60"
+      # Frontend is served from the same container, so same-origin: no CORS
+      # entry needed. Add origins here only if you split them apart.
+      - key: ANIM_CORS_ALLOW_ORIGINS
+        value: ""

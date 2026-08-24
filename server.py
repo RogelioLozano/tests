@@ -52,8 +52,9 @@ class StaticHandler(SimpleHTTPRequestHandler):
         return None
 
     def translate_path(self, path: str) -> str:
-        # Placeholder for the future FastAPI backend: for now /api/* is served
-        # from the same static directory, with the /api prefix stripped.
+        # Static JSON fixtures live under /api here. The real backend
+        # (backend/app, run via run_api.sh) owns /api/v1; in development the
+        # Vite proxy routes that prefix to it before this server ever sees it.
         if path == "/api" or path.startswith("/api/"):
             path = path[len("/api"):] or "/"
         return super().translate_path(path)
