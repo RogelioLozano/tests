@@ -168,3 +168,49 @@ class RenderJob:
 
     def failed(self, failure: JobFailure, now: datetime) -> RenderJob:
         return replace(self, status=JobStatus.FAILED, failure=failure, updated_at=now)
+
+
+@dataclass(frozen=True, slots=True)
+class GitHubSession:
+    """One browser's delegated access to a visitor's public GitHub data.
+
+    Identified by the *hash* of the cookie value rather than the value itself,
+    so a leaked copy of this table cannot be replayed as a login: the only
+    place the real token exists is the user's own cookie jar.
+
+    `access_token` is GitHub's, and never leaves the server.
+    """
+
+    token_hash: str
+    login: str
+    access_token: str = field(repr=False)
+    created_at: datetime
+    expires_at: datetime
+    avatar_url: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class GitHubIdentity:
+    """Who a token belongs to. Public profile data only."""
+
+    login: str
+    avatar_url: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class Repository:
+    """A public repository, reshaped away from GitHub's wire format.
+
+    Mapped here rather than passed through raw so the API contract is this
+    project's own and cannot drift when GitHub adds or renames a field.
+    """
+
+    name: str
+    full_name: str
+    url: str
+    description: str | None = None
+    language: str | None = None
+    stars: int = 0
+    forks: int = 0
+    pushed_at: datetime | None = None
+    is_fork: bool = False

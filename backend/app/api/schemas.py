@@ -8,12 +8,12 @@ and the mapping below is where any divergence gets resolved.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Sequence
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.application.animation_service import JobPage
-from app.domain.models import Quality, RenderJob
+from app.domain.models import GitHubSession, Quality, RenderJob, Repository
 
 
 class CreateAnimationRequest(BaseModel):
@@ -114,3 +114,69 @@ class CapabilitiesResponse(BaseModel):
     # Whether submitting a prompt needs an access code. Not the code itself,
     # obviously — only whether the UI should ask for one.
     requires_key: bool = False
+
+
+class GitHubConnectionResponse(BaseModel):
+    """Enough for the UI to choose between "connect", "connected" and "hidden".
+
+    Carries no token: the session lives in an HttpOnly cookie the page cannot
+    read, which is the point.
+    """
+
+    available: bool
+    connected: bool
+    login: str | None = None
+    avatar_url: str | None = None
+    expires_at: datetime | None = None
+
+    @classmethod
+    def from_domain(cls, session: GitHubSession | None) -> "GitHubConnectionResponse":
+        if session is None:
+            return cls(available=True, connected=False)
+        return cls(
+            available=True,
+            connected=True,
+            login=session.login,
+            avatar_url=session.avatar_url,
+            expires_at=session.expires_at,
+        )
+
+
+class RepositoryResponse(BaseModel):
+    name: str
+    full_name: str
+    url: str
+    description: str | None = None
+    language: str | None = None
+    stars: int = 0
+    forks: int = 0
+    pushed_at: datetime | None = None
+    is_fork: bool = False
+
+    @classmethod
+    def from_domain(cls, repository: Repository) -> "RepositoryResponse":
+        return cls(
+            name=repository.name,
+            full_name=repository.full_name,
+            url=repository.url,
+            description=repository.description,
+            language=repository.language,
+            stars=repository.stars,
+            forks=repository.forks,
+            pushed_at=repository.pushed_at,
+            is_fork=repository.is_fork,
+        )
+
+
+class RepositoryListResponse(BaseModel):
+    items: list[RepositoryResponse]
+    total: int
+
+    @classmethod
+    def from_domain(
+        cls, repositories: Sequence[Repository]
+    ) -> "RepositoryListResponse":
+        return cls(
+            items=[RepositoryResponse.from_domain(r) for r in repositories],
+            total=len(repositories),
+        )

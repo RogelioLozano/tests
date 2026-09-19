@@ -165,6 +165,19 @@ def repository(tmp_path: Path, logger: RecordingLogger) -> SqliteRenderJobReposi
 
 
 @pytest.fixture
+def sessions(tmp_path: Path, logger: RecordingLogger):
+    from app.infrastructure.persistence.sqlite.session_repository import (
+        SqliteGitHubSessionRepository,
+    )
+
+    database = SqliteDatabase(
+        DatabaseSettings(path=tmp_path / "metadata.db"), logger
+    )
+    database.migrate()
+    return SqliteGitHubSessionRepository(database)
+
+
+@pytest.fixture
 def storage(tmp_path: Path, logger: RecordingLogger) -> LocalDirectoryStorage:
     return LocalDirectoryStorage(StorageSettings(root=tmp_path / "library"), logger)
 
