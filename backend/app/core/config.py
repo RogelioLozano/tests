@@ -153,6 +153,51 @@ class LoggingSettings:
 
 
 @dataclass(frozen=True, slots=True)
+class GitHubSettings:
+    """Delegated, read-only access to a visitor's public GitHub data.
+
+    Unset credentials mean the feature is simply absent: the API reports it as
+    unavailable and the frontend hides the tab, so a deployment without an
+    OAuth app is a smaller application rather than a broken one.
+    """
+
+    # Public by design: it travels in the authorize URL, so it is visible in
+    # the user's address bar on every connect. Only the secret is a secret.
+    client_id: str = ""
+    client_secret: str = field(default="", repr=False)
+    # Compared by GitHub as an exact string, so this must match the value
+    # registered on the OAuth app byte for byte.
+    redirect_uri: str = ""
+    # Deliberately empty. An unscoped token can still read public repositories;
+    # `public_repo` would grant *write* access, which this feature never uses.
+    scopes: tuple[str, ...] = ()
+    # Endpoints are settings rather than constants so a test can point the
+    # adapter at a local fake instead of reaching github.com.
+    authorize_url: str = "https://github.com/login/oauth/authorize"
+    token_url: str = "https://github.com/login/oauth/access_token"
+    api_base_url: str = "https://api.github.com"
+    timeout_seconds: float = 10.0
+    # Kept under GitHub's 8-hour token lifetime so a session can never outlive
+    # the credential it holds, which is what makes refresh handling unnecessary.
+    session_ttl_seconds: int = 8 * 60 * 60
+    # The CSRF value only has to survive a trip to github.com and back.
+    state_ttl_seconds: int = 10 * 60
+
+    @property
+    def enabled(self) -> bool:
+        return bool(self.client_id and self.client_secret and self.redirect_uri)
+
+    @property
+    def cookie_secure(self) -> bool:
+        """Derived from the redirect scheme so the two cannot drift apart.
+
+        Safari drops a Secure cookie sent over plain http, which would leave
+        local development unable to hold a session at all.
+        """
+        return self.redirect_uri.startswith("https://")
+
+
+@dataclass(frozen=True, slots=True)
 class Settings:
     environment: str = "local"
     cors_allow_origins: tuple[str, ...] = ("http://localhost:5100", "http://127.0.0.1:5100")
@@ -173,6 +218,35 @@ class Settings:
     database: DatabaseSettings = field(default_factory=DatabaseSettings)
     logging: LoggingSettings = field(default_factory=LoggingSettings)
     rate_limit: RateLimitSettings = field(default_factory=RateLimitSettings)
+    github: GitHubSettings = field(default_factory=GitHubSettings)
+
+
+def _load_github() -> GitHubSettings:
+    settings = GitHubSettings(
+        client_id=_env("ANIM_GITHUB_CLIENT_ID", ""),
+        client_secret=os.environ.get("ANIM_GITHUB_CLIENT_SECRET", "").strip(),
+        redirect_uri=_env("ANIM_GITHUB_REDIRECT_URI", ""),
+        scopes=_env_list("ANIM_GITHUB_SCOPES", ()),
+        timeout_seconds=_env_float("ANIM_GITHUB_TIMEOUT_SECONDS", 10.0),
+        session_ttl_seconds=_env_int("ANIM_GITHUB_SESSION_TTL_SECONDS", 8 * 60 * 60),
+    )
+
+    # Only the credentials signal intent to enable, so the redirect URI can stay
+    # committed in render.yaml without breaking a deployment that has no OAuth
+    # app. Half a pair fails at startup rather than at the callback, where it
+    # would surface as a 500 after the user had already granted access.
+    if bool(settings.client_id) != bool(settings.client_secret):
+        raise ConfigurationError(
+            "GitHub OAuth is half-configured: ANIM_GITHUB_CLIENT_ID and "
+            "ANIM_GITHUB_CLIENT_SECRET must be set together, or both left unset "
+            "to disable the feature."
+        )
+    if settings.client_id and not settings.redirect_uri:
+        raise ConfigurationError(
+            "GitHub OAuth needs ANIM_GITHUB_REDIRECT_URI, matching a Redirect "
+            "URI registered on the OAuth app exactly."
+        )
+    return settings
 
 
 def load_settings() -> Settings:
@@ -256,4 +330,5 @@ def load_settings() -> Settings:
             max_identities=_env_int("ANIM_RATE_LIMIT_MAX_IDENTITIES", 10_000),
             trust_proxy=_env_bool("ANIM_TRUST_PROXY", False),
         ),
+        github=_load_github(),
     )

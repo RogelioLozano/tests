@@ -49,6 +49,15 @@ services:
       # Leave unset to run fully open.
       - key: ANIM_API_KEY
         sync: false
+      # GitHub OAuth. The client id is public (it travels in the authorize URL),
+      # so it is committed; the secret is set in the dashboard only. The
+      # redirect URI must match the OAuth app registration exactly.
+      - key: ANIM_GITHUB_CLIENT_ID
+        value: Ov23lifoWLJqAUbDCyBV
+      - key: ANIM_GITHUB_CLIENT_SECRET
+        sync: false
+      - key: ANIM_GITHUB_REDIRECT_URI
+        value: https://app.rogeliolozano.dev/api/v1/auth/github/callback
       - key: ANIM_LLM_BASE_URL
         value: https://api.groq.com/openai/v1
       - key: ANIM_LLM_MODEL
@@ -89,4 +98,4 @@ services:
       # Frontend is served from the same container, so same-origin: no CORS
       # entry needed. Add origins here only if you split them apart.
       - key: ANIM_CORS_ALLOW_ORIGINS
-        value: ""
+        value: "" 
