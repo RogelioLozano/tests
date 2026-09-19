@@ -187,3 +187,30 @@ class GitHubSession:
     created_at: datetime
     expires_at: datetime
     avatar_url: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class GitHubIdentity:
+    """Who a token belongs to. Public profile data only."""
+
+    login: str
+    avatar_url: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class Repository:
+    """A public repository, reshaped away from GitHub's wire format.
+
+    Mapped here rather than passed through raw so the API contract is this
+    project's own and cannot drift when GitHub adds or renames a field.
+    """
+
+    name: str
+    full_name: str
+    url: str
+    description: str | None = None
+    language: str | None = None
+    stars: int = 0
+    forks: int = 0
+    pushed_at: datetime | None = None
+    is_fork: bool = False

@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 from app.application.animation_service import AnimationService
+from app.application.github_service import GitHubService
 from app.application.job_recovery import JobRecovery
 from app.application.render_pipeline import RenderPipeline
 from app.core.clock import SystemClock, UuidGenerator
@@ -21,6 +22,7 @@ from app.domain.ports.logging import Logger, LoggerFactory
 from app.domain.ports.rate_limit import RateLimiter
 from app.domain.ports.repository import GitHubSessionRepository
 from app.infrastructure.ai.factory import build_scene_generator
+from app.infrastructure.github.factory import build_github_client
 from app.infrastructure.jobs.factory import build_job_dispatch
 from app.infrastructure.logging.factory import build_logger_factory
 from app.infrastructure.persistence.factory import build_persistence
@@ -39,6 +41,7 @@ class Container:
     migrate: Callable[[], None]
     rate_limiter: RateLimiter | None = None
     github_sessions: GitHubSessionRepository | None = None
+    github: GitHubService | None = None
     drain: Callable[[], None] = lambda: None
     recover: Callable[[], int] = lambda: 0
     purge_sessions: Callable[[], int] = lambda: 0
@@ -101,6 +104,19 @@ def build_container(settings: Settings) -> Container:
         max_quality=Quality(settings.render.max_quality),
     )
 
+    github_client = build_github_client(settings.github, log("github"))
+    github = (
+        GitHubService(
+            client=github_client,
+            sessions=persistence.github_sessions,
+            clock=clock,
+            logger=log("github"),
+            session_ttl_seconds=settings.github.session_ttl_seconds,
+        )
+        if github_client is not None
+        else None
+    )
+
     container = Container(
         settings=settings,
         logger_factory=logger_factory,
@@ -109,6 +125,7 @@ def build_container(settings: Settings) -> Container:
         migrate=persistence.initialise,
         rate_limiter=build_rate_limiter(settings.rate_limit, log("ratelimit")),
         github_sessions=persistence.github_sessions,
+        github=github,
         drain=dispatch.shutdown,
         recover=JobRecovery(
             jobs=persistence.jobs, clock=clock, logger=log("recovery")

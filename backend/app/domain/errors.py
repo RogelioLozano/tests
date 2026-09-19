@@ -68,6 +68,17 @@ class StorageError(DomainError):
     code = "storage_failed"
 
 
+class IntegrationError(DomainError):
+    """A third party this app delegates to was unreachable or misbehaved.
+
+    Distinct from UnauthorizedError: that one means the credential was refused
+    and the user can fix it by reconnecting, this one means the fault is not
+    theirs and retrying later is the remedy.
+    """
+
+    code = "integration_failed"
+
+
 class RepositoryError(DomainError):
     code = "repository_failed"
 
