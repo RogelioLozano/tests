@@ -53,7 +53,7 @@ services:
       # so it is committed; the secret is set in the dashboard only. The
       # redirect URI must match the OAuth app registration exactly.
       - key: ANIM_GITHUB_CLIENT_ID
-        value: Ov23lifoWLJqAUbDCyBV
+        sync: false
       - key: ANIM_GITHUB_CLIENT_SECRET
         sync: false
       - key: ANIM_GITHUB_REDIRECT_URI
