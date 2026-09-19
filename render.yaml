@@ -57,7 +57,7 @@ services:
       - key: ANIM_GITHUB_CLIENT_SECRET
         sync: false
       - key: ANIM_GITHUB_REDIRECT_URI
-        value: https://app.rogeliolozano.dev/api/v1/auth/github/callback
+        sync: false
       - key: ANIM_LLM_BASE_URL
         value: https://api.groq.com/openai/v1
       - key: ANIM_LLM_MODEL
