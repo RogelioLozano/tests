@@ -44,6 +44,20 @@ MIGRATIONS: tuple[tuple[str, ...], ...] = (
         "ON render_jobs (created_at DESC)",
         "CREATE INDEX IF NOT EXISTS ix_render_jobs_status ON render_jobs (status)",
     ),
+    (
+        """
+        CREATE TABLE IF NOT EXISTS github_sessions (
+            token_hash   TEXT PRIMARY KEY,
+            access_token TEXT NOT NULL,
+            login        TEXT NOT NULL,
+            avatar_url   TEXT,
+            created_at   TEXT NOT NULL,
+            expires_at   TEXT NOT NULL
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS ix_github_sessions_expires_at "
+        "ON github_sessions (expires_at)",
+    ),
 )
 
 

@@ -1,10 +1,11 @@
-"""Persistence port for render job metadata."""
+"""Persistence ports."""
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Protocol, Sequence
 
-from app.domain.models import RenderJob
+from app.domain.models import GitHubSession, RenderJob
 
 
 class RenderJobRepository(Protocol):
@@ -36,3 +37,26 @@ class RenderJobRepository(Protocol):
         ...
 
     def count(self) -> int: ...
+
+
+class GitHubSessionRepository(Protocol):
+    """Delegated GitHub access, keyed by the hash of a browser's cookie value.
+
+    There is deliberately no `list`: sessions are looked up one at a time by a
+    caller that already holds the token, never enumerated.
+    """
+
+    def add(self, session: GitHubSession) -> None: ...
+
+    def find(self, token_hash: str, *, now: datetime) -> GitHubSession | None:
+        """An expired session is never returned, so a missed expiry check
+        upstream cannot be turned into a valid login."""
+        ...
+
+    def delete(self, token_hash: str) -> None:
+        """Idempotent: logging out twice, or after expiry, is not an error."""
+        ...
+
+    def purge_expired(self, *, now: datetime) -> int:
+        """Drop rows past their expiry; returns how many went."""
+        ...
