@@ -54,79 +54,9 @@ body {
   line-height: 1.5;
 }
 
-main {
-  max-width: 40rem;
-  margin: 0 auto;
-}
-
-h1 {
-  font-size: 1.6rem;
-  margin: 0 0 0.25rem;
-}
-
 .lede {
   color: var(--muted-foreground);
   margin: 0 0 2rem;
-}
-
-.card {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 1.25rem 1.5rem;
-}
-
-.card h2 {
-  font-size: 0.8rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted-foreground);
-  margin: 0 0 1rem;
-}
-
-dl {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.5rem 1.5rem;
-  margin: 0;
-}
-
-dt {
-  color: var(--muted-foreground);
-}
-
-dd {
-  margin: 0;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-}
-
-.total {
-  font-size: 1.5rem;
-  font-weight: 600;
-}
-
-.waifu-img {
-  display: block;
-  max-width: 100%;
-  border-radius: 8px;
-  margin: 0 0 1rem;
-}
-
-.error {
-  color: var(--destructive);
-}
-
-footer {
-  margin-top: 2rem;
-  color: var(--muted-foreground);
-  font-size: 0.85rem;
-}
-
-code {
-  background: rgba(129, 139, 152, 0.15);
-  border-radius: 4px;
-  padding: 0.1rem 0.35rem;
-  font-size: 0.9em;
 }
 
 @media (prefers-color-scheme: dark) {
