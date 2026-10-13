@@ -22,7 +22,4 @@ media
 # Not needed at runtime
 README.md
 backend/tests
-public
-server.py
-run.sh
 run_api.sh
